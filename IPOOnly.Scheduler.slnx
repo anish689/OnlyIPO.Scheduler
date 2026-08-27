@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/IPOOnly.Scheduler/IPOOnly.Scheduler.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/IPOOnly.Scheduler.Tests/IPOOnly.Scheduler.Tests.csproj" />
+  </Folder>
+</Solution>
