@@ -1,4 +1,5 @@
 using IPOOnly.Scheduler.Upstox;
+using System.Text.Json;
 
 namespace IPOOnly.Scheduler.Tests;
 
@@ -69,5 +70,28 @@ public sealed class UpstoxIpoMapperTests
 
         Assert.Equal("Listed", record.Status);
         Assert.Equal("SME", record.MarketType);
+    }
+
+    [Fact]
+    public void Map_ExtractsRegistrarFromStructuredRegistrarInfo()
+    {
+        using var document = JsonDocument.Parse("""{"name":"KFin Technologies Limited","phone":"1800"}""");
+
+        var record = _mapper.Map(
+            new UpstoxIpoSummary
+            {
+                Id = "registrar-ipo",
+                Name = "Registrar IPO",
+                Status = "open",
+                IssueType = "regular"
+            },
+            new UpstoxIpoDetail
+            {
+                Id = "registrar-ipo",
+                RegistrarInfo = document.RootElement.Clone()
+            },
+            DateTimeOffset.UnixEpoch);
+
+        Assert.Equal("KFin Technologies Limited", record.Registrar);
     }
 }

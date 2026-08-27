@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using System.Text.Json;
 
 namespace IPOOnly.Scheduler.Upstox;
 
@@ -134,7 +135,7 @@ public sealed class UpstoxIpoDetail
     public string? ListingDate { get; init; }
 
     [JsonPropertyName("registrar_info")]
-    public string? RegistrarInfo { get; init; }
+    public JsonElement? RegistrarInfo { get; init; }
 
     [JsonPropertyName("total_subscription")]
     public decimal? TotalSubscription { get; init; }
