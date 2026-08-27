@@ -1,4 +1,5 @@
 using IPOOnly.Scheduler.Persistence;
+using System.Text.Json;
 
 namespace IPOOnly.Scheduler.Upstox;
 
@@ -28,7 +29,7 @@ public sealed class UpstoxIpoMapper
             RefundDate: ParseIndianDate(detail?.RefundInitiationDate),
             DematCreditDate: ParseIndianDate(detail?.DematTransferDate),
             ListingDate: ParseIndianDate(detail?.ListingDate),
-            Registrar: BlankToNull(detail?.RegistrarInfo),
+            Registrar: ExtractRegistrar(detail?.RegistrarInfo),
             OverallSubscription: detail?.TotalSubscription ?? summary.TotalSubscription,
             DrhpDocumentUrl: BlankToNull(detail?.DrhpUrl),
             RhpDocumentUrl: BlankToNull(detail?.RhpUrl),
@@ -98,6 +99,40 @@ public sealed class UpstoxIpoMapper
     private static string? BlankToNull(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static string? ExtractRegistrar(JsonElement? value)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        var element = value.Value;
+
+        if (element.ValueKind == JsonValueKind.String)
+        {
+            return BlankToNull(element.GetString());
+        }
+
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        foreach (var propertyName in new[] { "name", "registrar_name", "company_name" })
+        {
+            if (element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.String)
+            {
+                var registrar = BlankToNull(property.GetString());
+                if (registrar is not null)
+                {
+                    return registrar;
+                }
+            }
+        }
+
+        return element.GetRawText();
     }
 
     private static DateTimeOffset? ParseIndianDate(string? value)
