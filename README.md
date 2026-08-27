@@ -13,3 +13,61 @@ This repository is intentionally separate from the React frontend and ASP.NET AP
 ## Security
 
 Do not commit broker tokens, database passwords, or `.env` files. Use .NET user secrets or environment variables for local development.
+
+## Local Setup
+
+The scheduler targets `.NET 10` because that is the installed SDK on the current machine.
+
+Set local secrets:
+
+```bash
+dotnet user-secrets set "Upstox:AnalyticsToken" "<upstox-token>" --project src/IPOOnly.Scheduler
+dotnet user-secrets set "ConnectionStrings:IPOOnlyDatabase" "Host=localhost;Port=5432;Database=ipoonly;Username=ipoonly;Password=ipoonly_dev_password" --project src/IPOOnly.Scheduler
+```
+
+Run a one-time sync:
+
+```bash
+dotnet run --project src/IPOOnly.Scheduler -- --run-once
+```
+
+Run as a long-lived scheduler:
+
+```bash
+dotnet run --project src/IPOOnly.Scheduler
+```
+
+## Configuration
+
+`Scheduler:Statuses` defaults to `open`, `upcoming`, `closed`, and `listed`.
+
+`Scheduler:PageSize` defaults to `30`, matching the Upstox maximum page size.
+
+`Scheduler:SyncIntervalMinutes` defaults to `10`, with a small jitter so repeated runs do not hit the provider at perfectly fixed boundaries.
+
+## Data Flow
+
+1. Fetch IPO pages from Upstox by status.
+2. Fetch detail data for each returned IPO id.
+3. Map Upstox values into the existing OnlyIPO `ipos` table.
+4. Upsert by `Slug`, using the Upstox IPO id as the provider key.
+
+The React app never receives the Upstox token. Public application data should continue to flow from the backend API.
+
+## Verification
+
+```bash
+dotnet restore IPOOnly.Scheduler.slnx
+dotnet build IPOOnly.Scheduler.slnx
+dotnet test IPOOnly.Scheduler.slnx
+```
+
+## Provider Notes
+
+Upstox documents the IPO list endpoint, IPO detail endpoint, and standard API rate limits here:
+
+- https://upstox.com/developer/api-documentation/get-ipos/
+- https://upstox.com/developer/api-documentation/get-ipo-details/
+- https://upstox.com/developer/api-documentation/rate-limiting/
+
+Before public redistribution of broker-derived IPO data, get written confirmation that the intended display and caching model is permitted.
