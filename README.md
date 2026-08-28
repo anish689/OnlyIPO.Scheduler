@@ -16,13 +16,13 @@ Do not commit broker tokens, database passwords, or `.env` files. Use .NET user 
 
 ## Local Setup
 
-The scheduler targets `.NET 10` because that is the installed SDK on the current machine.
+The scheduler targets `.NET 8` to align with the OnlyIPO backend API and the current long-term support development runtime.
 
 Set local secrets:
 
 ```bash
 dotnet user-secrets set "Upstox:AnalyticsToken" "<upstox-token>" --project src/IPOOnly.Scheduler
-dotnet user-secrets set "ConnectionStrings:IPOOnlyDatabase" "Host=localhost;Port=5432;Database=ipoonly;Username=ipoonly;Password=ipoonly_dev_password" --project src/IPOOnly.Scheduler
+dotnet user-secrets set "ConnectionStrings:IPOOnlyDatabase" "Host=localhost;Port=5432;Database=ipoonly;Username=ipoonly;Password=<LOCAL_DB_PASSWORD>" --project src/IPOOnly.Scheduler
 ```
 
 Run a one-time sync:
@@ -57,9 +57,9 @@ The React app never receives the Upstox token. Public application data should co
 ## Verification
 
 ```bash
-dotnet restore IPOOnly.Scheduler.slnx
-dotnet build IPOOnly.Scheduler.slnx
-dotnet test IPOOnly.Scheduler.slnx
+dotnet restore IPOOnly.Scheduler.sln
+dotnet build IPOOnly.Scheduler.sln
+dotnet test IPOOnly.Scheduler.sln
 ```
 
 ## Provider Notes

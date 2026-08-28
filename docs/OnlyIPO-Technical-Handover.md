@@ -61,8 +61,11 @@ Current machine setup:
 - Git
 - GitHub CLI: `gh`
 - Node.js/npm
-- .NET SDK `10.0.100`
-- PostgreSQL running locally
+- .NET SDK `8.0.424` for application development and debugging
+- .NET SDK `10.0.100` is also installed locally, but the OnlyIPO backend and scheduler are aligned to `.NET 8`
+- PostgreSQL 15 running locally through Homebrew
+- PostgreSQL client tools available at `/opt/homebrew/opt/postgresql@15/bin`
+- Docker CLI is installed, but Docker Desktop/daemon may be stopped; backend integration tests can fall back to local PostgreSQL
 
 Verify tools:
 
@@ -72,6 +75,8 @@ gh auth status
 node --version
 npm --version
 dotnet --version
+psql --version
+brew services list | grep postgresql
 ```
 
 GitHub SSH/auth was verified earlier using:
@@ -79,6 +84,39 @@ GitHub SSH/auth was verified earlier using:
 ```bash
 ssh -T git@github.com
 gh auth status
+```
+
+Rider settings:
+
+```text
+Settings > Build, Execution, Deployment > Toolset and Build
+.NET CLI executable path: /usr/local/share/dotnet/dotnet
+```
+
+Open these solution files in Rider:
+
+```text
+/Users/anishtaneja/Desktop/Projects/OnlyIPO/IPOOnly.sln
+/Users/anishtaneja/Desktop/Projects/OnlyIPO.Scheduler/IPOOnly.Scheduler.sln
+```
+
+Both backend and scheduler now target `.NET 8`, and each repo pins SDK `8.0.424` through `global.json`.
+
+PostgreSQL local readiness:
+
+```bash
+psql -h 127.0.0.1 -p 5432 -d postgres -c "SELECT current_user, version();"
+PGPASSWORD=<LOCAL_DB_PASSWORD> psql -h 127.0.0.1 -p 5432 -U ipoonly -d ipoonly -c "SELECT count(*) FROM ipos;"
+```
+
+Expected app database setup:
+
+```text
+Server: localhost / 127.0.0.1
+Port: 5432
+Database: ipoonly
+Application role: ipoonly
+Application password: store locally only, do not commit
 ```
 
 ## 4. Start the Backend API Locally
@@ -105,7 +143,7 @@ Important connection string key:
 ```json
 {
   "ConnectionStrings": {
-    "IPOOnlyDatabase": "Host=localhost;Port=5432;Database=ipoonly;Username=ipoonly;Password=ipoonly_dev_password"
+    "IPOOnlyDatabase": "Host=localhost;Port=5432;Database=ipoonly;Username=ipoonly;Password=<LOCAL_DB_PASSWORD>"
   }
 }
 ```
@@ -174,12 +212,12 @@ Repository:
 cd /Users/anishtaneja/Desktop/Projects/OnlyIPO.Scheduler
 ```
 
-The scheduler is a standalone .NET console/worker app. It targets `.NET 10` because this machine currently has only the .NET 10 SDK/reference packs installed.
+The scheduler is a standalone .NET console/worker app. It targets `.NET 8` to align with the backend API and make Rider debugging consistent across backend services.
 
 Set required user-secrets:
 
 ```bash
-dotnet user-secrets set "ConnectionStrings:IPOOnlyDatabase" "Host=localhost;Port=5432;Database=ipoonly;Username=ipoonly;Password=ipoonly_dev_password" --project src/IPOOnly.Scheduler/IPOOnly.Scheduler.csproj
+dotnet user-secrets set "ConnectionStrings:IPOOnlyDatabase" "Host=localhost;Port=5432;Database=ipoonly;Username=ipoonly;Password=<LOCAL_DB_PASSWORD>" --project src/IPOOnly.Scheduler/IPOOnly.Scheduler.csproj
 dotnet user-secrets set "Upstox:AnalyticsToken" "<UPSTOX_TOKEN>" --project src/IPOOnly.Scheduler/IPOOnly.Scheduler.csproj
 ```
 
@@ -392,7 +430,7 @@ This means rerunning the scheduler updates existing live rows instead of duplica
 
 | File | Purpose |
 | --- | --- |
-| `/Users/anishtaneja/Desktop/Projects/OnlyIPO.Scheduler/IPOOnly.Scheduler.slnx` | Scheduler solution |
+| `/Users/anishtaneja/Desktop/Projects/OnlyIPO.Scheduler/IPOOnly.Scheduler.sln` | Scheduler solution |
 | `/Users/anishtaneja/Desktop/Projects/OnlyIPO.Scheduler/src/IPOOnly.Scheduler/Program.cs` | Host setup, options, DI, run-once mode, worker registration |
 | `/Users/anishtaneja/Desktop/Projects/OnlyIPO.Scheduler/src/IPOOnly.Scheduler/SchedulerOptions.cs` | Scheduler interval/page/status config |
 | `/Users/anishtaneja/Desktop/Projects/OnlyIPO.Scheduler/src/IPOOnly.Scheduler/IpoSyncService.cs` | Main sync orchestration |
@@ -425,8 +463,8 @@ During the first live Upstox run, `registrar_info` came back as an object instea
 Verification required before merge:
 
 ```text
-dotnet build IPOOnly.Scheduler.slnx --no-restore
-dotnet test IPOOnly.Scheduler.slnx --no-build
+dotnet build IPOOnly.Scheduler.sln --no-restore
+dotnet test IPOOnly.Scheduler.sln --no-build
 DOTNET_ENVIRONMENT=Development dotnet run --project src/IPOOnly.Scheduler/IPOOnly.Scheduler.csproj -- --run-once
 ```
 
@@ -518,9 +556,9 @@ Scheduler:
 
 ```bash
 cd /Users/anishtaneja/Desktop/Projects/OnlyIPO.Scheduler
-dotnet restore IPOOnly.Scheduler.slnx
-dotnet build IPOOnly.Scheduler.slnx --no-restore
-dotnet test IPOOnly.Scheduler.slnx --no-build
+dotnet restore IPOOnly.Scheduler.sln
+dotnet build IPOOnly.Scheduler.sln --no-restore
+dotnet test IPOOnly.Scheduler.sln --no-build
 ```
 
 Live scheduler test:
@@ -577,7 +615,7 @@ Do not paste secret values into tickets or commits.
 Check PostgreSQL is running and the connection string matches the backend:
 
 ```bash
-dotnet user-secrets set "ConnectionStrings:IPOOnlyDatabase" "Host=localhost;Port=5432;Database=ipoonly;Username=ipoonly;Password=ipoonly_dev_password" --project src/IPOOnly.Scheduler/IPOOnly.Scheduler.csproj
+dotnet user-secrets set "ConnectionStrings:IPOOnlyDatabase" "Host=localhost;Port=5432;Database=ipoonly;Username=ipoonly;Password=<LOCAL_DB_PASSWORD>" --project src/IPOOnly.Scheduler/IPOOnly.Scheduler.csproj
 ```
 
 Check backend can read the same database:
