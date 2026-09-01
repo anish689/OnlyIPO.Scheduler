@@ -60,6 +60,11 @@ DOTNET_ENVIRONMENT=Development dotnet run --project src/IPOOnly.Scheduler
 
 `DOTNET_ENVIRONMENT=Development` is required for local runs that depend on .NET user-secrets.
 
+IPO detail behavior:
+
+- Upstox sends some important dates inside a nested `timeline` object. The scheduler maps those fields first, then falls back to legacy top-level date fields when present.
+- Upstox `industry` is stored in the existing IPO description field until a dedicated company-profile enrichment phase adds a normalized industry column.
+
 Subscription category behavior:
 
 - `Overall` comes from Upstox when present.

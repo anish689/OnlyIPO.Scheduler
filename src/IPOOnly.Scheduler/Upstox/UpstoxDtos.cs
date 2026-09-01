@@ -88,6 +88,9 @@ public sealed class UpstoxIpoDetail
     [JsonPropertyName("issue_type")]
     public string? IssueType { get; init; }
 
+    [JsonPropertyName("industry")]
+    public string? Industry { get; init; }
+
     [JsonPropertyName("issue_size")]
     public decimal? IssueSize { get; init; }
 
@@ -136,9 +139,33 @@ public sealed class UpstoxIpoDetail
     [JsonPropertyName("listing_date")]
     public string? ListingDate { get; init; }
 
+    [JsonPropertyName("timeline")]
+    public UpstoxIpoTimeline? Timeline { get; init; }
+
     [JsonPropertyName("registrar_info")]
     public JsonElement? RegistrarInfo { get; init; }
 
     [JsonPropertyName("total_subscription")]
     public decimal? TotalSubscription { get; init; }
+}
+
+public sealed class UpstoxIpoTimeline
+{
+    [JsonPropertyName("application_start_date")]
+    public string? ApplicationStartDate { get; init; }
+
+    [JsonPropertyName("application_end_date")]
+    public string? ApplicationEndDate { get; init; }
+
+    [JsonPropertyName("allotment_date")]
+    public string? AllotmentDate { get; init; }
+
+    [JsonPropertyName("refund_initiation_date")]
+    public string? RefundInitiationDate { get; init; }
+
+    [JsonPropertyName("demat_transfer_date")]
+    public string? DematTransferDate { get; init; }
+
+    [JsonPropertyName("listing_date")]
+    public string? ListingDate { get; init; }
 }

@@ -3,6 +3,7 @@ namespace IPOOnly.Scheduler.Persistence;
 public sealed record IpoRecord(
     string Slug,
     string CompanyName,
+    string? Description,
     string Status,
     string MarketType,
     int Exchanges,

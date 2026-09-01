@@ -320,6 +320,8 @@ Important provider rules implemented:
 - Fetch list pages by status.
 - Fetch details for each Upstox IPO id.
 - Use Upstox IPO id as `Slug` in the OnlyIPO database.
+- Prefer nested Upstox `timeline` dates for application, allotment, refund, demat, and listing dates; fall back to top-level date fields if the provider returns them there.
+- Store Upstox `industry` as IPO description text for now, pending a future normalized company-profile model.
 - Treat zero-valued price fields as unknown/null, not as real zero rupee values.
 - Parse `registrar_info` as either string or object.
 - Use parameterized PostgreSQL commands.
@@ -654,6 +656,11 @@ Fix approach:
 3. Update `UpstoxIpoMapper.cs`.
 4. Add a regression test in `UpstoxIpoMapperTests.cs`.
 5. Run build/test/live sync again.
+
+Field availability checks:
+
+- If dates are visible in the raw Upstox payload under `timeline`, they must map into the flat IPO read model and the normalized timeline events table.
+- If category-wise subscriptions such as retail, QIB, NII, or employee are absent from the Upstox payload, keep them as `NotProvidedBySource`; do not manufacture values from overall subscription.
 
 ## 15. Security Notes
 

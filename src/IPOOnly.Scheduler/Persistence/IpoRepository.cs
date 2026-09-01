@@ -17,7 +17,7 @@ public sealed class IpoRepository(NpgsqlDataSource dataSource)
                 "OverallSubscription", "DrhpDocumentUrl", "RhpDocumentUrl", "ExchangeAnnouncementUrl",
                 "CompanyWebsiteUrl", "SourceName", "SourceUrl", "SourceUpdatedAt", "CreatedAt", "UpdatedAt")
             VALUES (
-                @Id, @Slug, @CompanyName, NULL, NULL, @Status, @MarketType, @Exchanges,
+                @Id, @Slug, @CompanyName, NULL, @Description, @Status, @MarketType, @Exchanges,
                 NULL, @IssueSize, NULL, NULL, @PriceBandMinimum,
                 @PriceBandMaximum, @LotSize, @MinimumInvestment, @FaceValue, @OpenDate, @CloseDate,
                 @AllotmentDate, @RefundDate, @DematCreditDate, @ListingDate, @Registrar, NULL,
@@ -27,6 +27,7 @@ public sealed class IpoRepository(NpgsqlDataSource dataSource)
                 NULL, @SourceName, @SourceUrl, @SourceUpdatedAt, @CreatedAt, @UpdatedAt)
             ON CONFLICT ("Slug") DO UPDATE SET
                 "CompanyName" = EXCLUDED."CompanyName",
+                "Description" = EXCLUDED."Description",
                 "Status" = EXCLUDED."Status",
                 "MarketType" = EXCLUDED."MarketType",
                 "Exchanges" = EXCLUDED."Exchanges",
@@ -58,6 +59,7 @@ public sealed class IpoRepository(NpgsqlDataSource dataSource)
         Add(command, "Id", id);
         Add(command, "Slug", ipo.Slug);
         Add(command, "CompanyName", ipo.CompanyName);
+        Add(command, "Description", ipo.Description);
         Add(command, "Status", ipo.Status);
         Add(command, "MarketType", ipo.MarketType);
         Add(command, "Exchanges", ipo.Exchanges);

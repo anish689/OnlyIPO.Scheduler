@@ -19,6 +19,7 @@ public sealed class UpstoxIpoMapper
         return new IpoRecord(
             Slug: summary.Id,
             CompanyName: name,
+            Description: BuildDescription(detail?.Industry),
             Status: MapStatus(FirstNonBlank(detail?.Status, summary.Status)),
             MarketType: MapMarketType(FirstNonBlank(detail?.IssueType, summary.IssueType)),
             Exchanges: MapExchanges(detail?.ListingExchange),
@@ -28,12 +29,12 @@ public sealed class UpstoxIpoMapper
             LotSize: lotSize,
             MinimumInvestment: maxPrice.HasValue && lotSize.HasValue ? maxPrice.Value * lotSize.Value : null,
             FaceValue: KnownMoney(detail?.FaceValue),
-            OpenDate: ParseIndianDate(detail?.BiddingStartDate ?? summary.BiddingStartDate),
-            CloseDate: ParseIndianDate(detail?.BiddingEndDate ?? summary.BiddingEndDate),
-            AllotmentDate: ParseIndianDate(detail?.AllotmentDate),
-            RefundDate: ParseIndianDate(detail?.RefundInitiationDate),
-            DematCreditDate: ParseIndianDate(detail?.DematTransferDate),
-            ListingDate: ParseIndianDate(detail?.ListingDate),
+            OpenDate: ParseIndianDate(detail?.Timeline?.ApplicationStartDate ?? detail?.BiddingStartDate ?? summary.BiddingStartDate),
+            CloseDate: ParseIndianDate(detail?.Timeline?.ApplicationEndDate ?? detail?.BiddingEndDate ?? summary.BiddingEndDate),
+            AllotmentDate: ParseIndianDate(detail?.Timeline?.AllotmentDate ?? detail?.AllotmentDate),
+            RefundDate: ParseIndianDate(detail?.Timeline?.RefundInitiationDate ?? detail?.RefundInitiationDate),
+            DematCreditDate: ParseIndianDate(detail?.Timeline?.DematTransferDate ?? detail?.DematTransferDate),
+            ListingDate: ParseIndianDate(detail?.Timeline?.ListingDate ?? detail?.ListingDate),
             Registrar: ExtractRegistrar(detail?.RegistrarInfo),
             OverallSubscription: detail?.TotalSubscription ?? summary.TotalSubscription,
             DrhpDocumentUrl: BlankToNull(detail?.DrhpUrl),
@@ -197,6 +198,12 @@ public sealed class UpstoxIpoMapper
     private static string? BlankToNull(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static string? BuildDescription(string? industry)
+    {
+        var value = BlankToNull(industry);
+        return value is null ? null : $"Industry: {value}";
     }
 
     private static string? ExtractRegistrar(JsonElement? value)
