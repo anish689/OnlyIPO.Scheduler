@@ -28,13 +28,13 @@ dotnet user-secrets set "ConnectionStrings:IPOOnlyDatabase" "Host=localhost;Port
 Run a one-time sync:
 
 ```bash
-dotnet run --project src/IPOOnly.Scheduler -- --run-once
+DOTNET_ENVIRONMENT=Development dotnet run --project src/IPOOnly.Scheduler -- --run-once
 ```
 
 Run as a long-lived scheduler:
 
 ```bash
-dotnet run --project src/IPOOnly.Scheduler
+DOTNET_ENVIRONMENT=Development dotnet run --project src/IPOOnly.Scheduler
 ```
 
 ## Configuration
@@ -48,9 +48,22 @@ dotnet run --project src/IPOOnly.Scheduler
 ## Data Flow
 
 1. Fetch IPO pages from Upstox by status.
-2. Fetch detail data for each returned IPO id.
-3. Map Upstox values into the existing OnlyIPO `ipos` table.
-4. Upsert by `Slug`, using the Upstox IPO id as the provider key.
+2. Store raw page payloads in `IpoSourceSnapshots`.
+3. Fetch detail data for each returned IPO id.
+4. Store raw detail payloads in `IpoSourceSnapshots`.
+5. Map Upstox values into the existing OnlyIPO `ipos` read model.
+6. Populate normalized child data:
+   - `IpoTimelineEvents`
+   - `IpoDocuments`
+   - `IpoSubscriptionSnapshots`
+7. Upsert by `Slug`, using the Upstox IPO id as the provider key.
+
+`DOTNET_ENVIRONMENT=Development` is required for local runs that depend on .NET user-secrets.
+
+Subscription category behavior:
+
+- `Overall` comes from Upstox when present.
+- `Retail`, `QIB`, `NII`, and `Employee` are currently stored as `NotProvidedBySource` because the current Upstox DTO does not provide category-wise values.
 
 The React app never receives the Upstox token. Public application data should continue to flow from the backend API.
 

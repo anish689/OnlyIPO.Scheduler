@@ -3,6 +3,8 @@ using System.Text.Json;
 
 namespace IPOOnly.Scheduler.Upstox;
 
+public sealed record UpstoxApiResponse<T>(T Payload, string RawJson, string SourceEndpoint);
+
 public sealed class UpstoxListResponse
 {
     [JsonPropertyName("data")]

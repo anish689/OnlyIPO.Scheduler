@@ -5,6 +5,11 @@ namespace IPOOnly.Scheduler.Upstox;
 
 public sealed class UpstoxIpoMapper
 {
+    private const string SourceName = "Upstox";
+    private const string Available = "Available";
+    private const string NotAnnounced = "NotAnnounced";
+    private const string NotProvidedBySource = "NotProvidedBySource";
+
     public IpoRecord Map(UpstoxIpoSummary summary, UpstoxIpoDetail? detail, DateTimeOffset fetchedAtUtc)
     {
         var name = FirstNonBlank(detail?.Name, summary.Name, summary.Symbol, summary.Id);
@@ -33,11 +38,104 @@ public sealed class UpstoxIpoMapper
             OverallSubscription: detail?.TotalSubscription ?? summary.TotalSubscription,
             DrhpDocumentUrl: BlankToNull(detail?.DrhpUrl),
             RhpDocumentUrl: BlankToNull(detail?.RhpUrl),
-            SourceName: "Upstox",
+            SourceName: SourceName,
             SourceUrl: $"https://api.upstox.com/v2/ipos/{Uri.EscapeDataString(summary.Id)}",
             SourceUpdatedAt: fetchedAtUtc,
             CreatedAt: fetchedAtUtc,
             UpdatedAt: fetchedAtUtc);
+    }
+
+    public IReadOnlyList<IpoTimelineEventRecord> MapTimeline(IpoRecord ipo, DateTimeOffset fetchedAtUtc)
+    {
+        return
+        [
+            Timeline("OpenDate", "Open date", ipo.OpenDate, fetchedAtUtc),
+            Timeline("CloseDate", "Close date", ipo.CloseDate, fetchedAtUtc),
+            Timeline("AllotmentDate", "Allotment", ipo.AllotmentDate, fetchedAtUtc),
+            Timeline("RefundDate", "Refund initiation", ipo.RefundDate, fetchedAtUtc),
+            Timeline("DematCreditDate", "Demat credit", ipo.DematCreditDate, fetchedAtUtc),
+            Timeline("ListingDate", "Listing", ipo.ListingDate, fetchedAtUtc)
+        ];
+    }
+
+    public IReadOnlyList<IpoDocumentRecord> MapDocuments(IpoRecord ipo, DateTimeOffset fetchedAtUtc)
+    {
+        var documents = new List<IpoDocumentRecord>();
+
+        AddDocument(documents, "DRHP", "Draft red herring prospectus", ipo.DrhpDocumentUrl, fetchedAtUtc);
+        AddDocument(documents, "RHP", "Red herring prospectus", ipo.RhpDocumentUrl, fetchedAtUtc);
+
+        return documents;
+    }
+
+    public IReadOnlyList<IpoSubscriptionSnapshotRecord> MapSubscriptionSnapshots(IpoRecord ipo, DateTimeOffset fetchedAtUtc)
+    {
+        return
+        [
+            Subscription("Retail", null, NotProvidedBySource, fetchedAtUtc),
+            Subscription("QIB", null, NotProvidedBySource, fetchedAtUtc),
+            Subscription("NII", null, NotProvidedBySource, fetchedAtUtc),
+            Subscription("Employee", null, NotProvidedBySource, fetchedAtUtc),
+            Subscription(
+                "Overall",
+                ipo.OverallSubscription,
+                ipo.OverallSubscription.HasValue ? Available : NotAnnounced,
+                fetchedAtUtc)
+        ];
+    }
+
+    private static IpoTimelineEventRecord Timeline(
+        string eventType,
+        string label,
+        DateTimeOffset? eventDate,
+        DateTimeOffset fetchedAtUtc)
+    {
+        return new IpoTimelineEventRecord(
+            eventType,
+            label,
+            eventDate,
+            eventDate.HasValue ? Available : NotAnnounced,
+            SourceName,
+            fetchedAtUtc,
+            fetchedAtUtc,
+            fetchedAtUtc);
+    }
+
+    private static void AddDocument(
+        List<IpoDocumentRecord> documents,
+        string documentType,
+        string label,
+        string? url,
+        DateTimeOffset fetchedAtUtc)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return;
+        }
+
+        documents.Add(new IpoDocumentRecord(
+            documentType,
+            label,
+            url.Trim(),
+            SourceName,
+            fetchedAtUtc,
+            fetchedAtUtc,
+            fetchedAtUtc));
+    }
+
+    private static IpoSubscriptionSnapshotRecord Subscription(
+        string investorCategory,
+        decimal? subscriptionTimes,
+        string availabilityStatus,
+        DateTimeOffset fetchedAtUtc)
+    {
+        return new IpoSubscriptionSnapshotRecord(
+            investorCategory,
+            subscriptionTimes,
+            availabilityStatus,
+            SourceName,
+            fetchedAtUtc,
+            fetchedAtUtc);
     }
 
     private static string MapStatus(string? status)

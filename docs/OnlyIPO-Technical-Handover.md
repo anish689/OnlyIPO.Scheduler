@@ -1,6 +1,6 @@
 # OnlyIPO Technical Handover
 
-Last updated: 27 August 2026
+Last updated: 1 September 2026
 
 This document explains the current OnlyIPO application stack, local setup, repositories, URLs, key files, data flow, development workflow, and operating steps. It is written so the project can be run and maintained without relying on AI support.
 
@@ -21,7 +21,7 @@ High-level flow:
 ```text
 Upstox IPO API
   -> OnlyIPO.Scheduler
-  -> PostgreSQL database, table: ipos
+  -> PostgreSQL database, tables: ipos + normalized IPO detail/source tables
   -> OnlyIPO backend API
   -> only-ipo-web frontend
 ```
@@ -45,11 +45,8 @@ Current verified backend data after live Upstox sync:
 
 ```json
 {
-  "openIpos": 11,
-  "upcomingIpos": 33,
-  "mainboardIpos": 70,
-  "smeIpos": 78,
-  "latestDataRefresh": "2026-08-27T12:29:45.218908+00:00"
+  "sourceName": "Upstox",
+  "latestDataRefresh": "2026-09-01T15:10:36.41468+00:00"
 }
 ```
 
@@ -244,7 +241,7 @@ DOTNET_ENVIRONMENT=Development \
 dotnet run --project src/IPOOnly.Scheduler/IPOOnly.Scheduler.csproj
 ```
 
-The successful live run fetched and upserted `142` IPO records.
+The latest successful live run fetched and upserted `140` IPO records.
 
 ## 7. Backend API Endpoints
 
@@ -391,6 +388,23 @@ ON CONFLICT ("Slug") DO UPDATE
 
 This means rerunning the scheduler updates existing live rows instead of duplicating them.
 
+Normalized IPO detail tables:
+
+| Table | Purpose |
+| --- | --- |
+| `IpoTimelineEvents` | One row per important IPO date such as open, close, allotment, refund, demat credit, and listing. |
+| `IpoDocuments` | One row per source document link such as DRHP or RHP. |
+| `IpoSubscriptionSnapshots` | One row per investor-category subscription value per sync timestamp. |
+| `IpoSourceSnapshots` | Raw source payload snapshots with a SHA-256 payload hash for diagnostics and future remapping. |
+
+Availability values:
+
+| Value | Meaning |
+| --- | --- |
+| `Available` | The source supplied a usable value. |
+| `NotAnnounced` | The source supports the field, but the current IPO payload did not announce it yet. |
+| `NotProvidedBySource` | The current source/DTO does not provide that category of data. |
+
 ## 10. Key Files
 
 ### Frontend
@@ -452,13 +466,13 @@ Current scheduler release state:
 
 ```text
 Repository: /Users/anishtaneja/Desktop/Projects/OnlyIPO.Scheduler
-Tracking issue: https://github.com/anish689/OnlyIPO.Scheduler/issues/3
-Feature branch: codex/ipo-1-live-payload-fixes
+Tracking issue: https://github.com/anish689/OnlyIPO/issues/25
+Feature branch: codex/phase13-normalized-ipo-data
 ```
 
 Why this branch exists:
 
-During the first live Upstox run, `registrar_info` came back as an object instead of a string. The fix updates the DTO/mapper to support both shapes and adds a regression test.
+OnlyIPO needs a trustworthy IPO detail foundation before the UI is enriched. This phase adds normalized source/timeline/document/subscription storage while preserving the existing `ipos` read model.
 
 Verification required before merge:
 
@@ -471,7 +485,7 @@ DOTNET_ENVIRONMENT=Development dotnet run --project src/IPOOnly.Scheduler/IPOOnl
 Result:
 
 ```text
-Fetched 142, upserted 142.
+Fetched 140, upserted 140.
 ```
 
 Before merging:

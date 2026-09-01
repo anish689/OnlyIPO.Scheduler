@@ -27,3 +27,41 @@ public sealed record IpoRecord(
     DateTimeOffset SourceUpdatedAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
+
+public sealed record IpoTimelineEventRecord(
+    string EventType,
+    string Label,
+    DateTimeOffset? EventDate,
+    string AvailabilityStatus,
+    string SourceName,
+    DateTimeOffset SourceUpdatedAt,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset UpdatedAtUtc);
+
+public sealed record IpoDocumentRecord(
+    string DocumentType,
+    string Label,
+    string Url,
+    string SourceName,
+    DateTimeOffset SourceUpdatedAt,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset UpdatedAtUtc);
+
+public sealed record IpoSubscriptionSnapshotRecord(
+    string InvestorCategory,
+    decimal? SubscriptionTimes,
+    string AvailabilityStatus,
+    string SourceName,
+    DateTimeOffset SourceUpdatedAt,
+    DateTimeOffset CapturedAtUtc);
+
+public sealed record IpoSourceSnapshotRecord(
+    Guid? IpoId,
+    string SourceName,
+    string SourceRecordId,
+    string SourceEndpoint,
+    string SourceStatus,
+    string PayloadJson,
+    string PayloadHash,
+    DateTimeOffset CapturedAtUtc,
+    DateTimeOffset? SourceUpdatedAt);
