@@ -94,4 +94,105 @@ public sealed class UpstoxIpoMapperTests
 
         Assert.Equal("KFin Technologies Limited", record.Registrar);
     }
+
+    [Fact]
+    public void MapTimeline_MarksMissingDatesAsNotAnnounced()
+    {
+        var record = _mapper.Map(
+            new UpstoxIpoSummary
+            {
+                Id = "timeline-ipo",
+                Name = "Timeline IPO",
+                Status = "open",
+                IssueType = "regular",
+                BiddingStartDate = "2026-09-01"
+            },
+            null,
+            DateTimeOffset.UnixEpoch);
+
+        var timeline = _mapper.MapTimeline(record, DateTimeOffset.UnixEpoch);
+
+        Assert.Contains(timeline, x => x.EventType == "OpenDate" && x.AvailabilityStatus == "Available");
+        Assert.Contains(timeline, x => x.EventType == "ListingDate" && x.AvailabilityStatus == "NotAnnounced");
+    }
+
+    [Fact]
+    public void MapDocuments_IncludesOnlyAvailableDocumentLinks()
+    {
+        var record = _mapper.Map(
+            new UpstoxIpoSummary
+            {
+                Id = "document-ipo",
+                Name = "Document IPO",
+                Status = "open",
+                IssueType = "regular"
+            },
+            new UpstoxIpoDetail
+            {
+                Id = "document-ipo",
+                RhpUrl = " https://example.com/rhp.pdf "
+            },
+            DateTimeOffset.UnixEpoch);
+
+        var documents = _mapper.MapDocuments(record, DateTimeOffset.UnixEpoch);
+
+        var document = Assert.Single(documents);
+        Assert.Equal("RHP", document.DocumentType);
+        Assert.Equal("https://example.com/rhp.pdf", document.Url);
+    }
+
+    [Fact]
+    public void MapSubscriptionSnapshots_SeparatesProvidedAndUnsupportedCategories()
+    {
+        var record = _mapper.Map(
+            new UpstoxIpoSummary
+            {
+                Id = "subscription-ipo",
+                Name = "Subscription IPO",
+                Status = "open",
+                IssueType = "regular",
+                TotalSubscription = 24.21m
+            },
+            null,
+            DateTimeOffset.UnixEpoch);
+
+        var snapshots = _mapper.MapSubscriptionSnapshots(record, DateTimeOffset.UnixEpoch);
+
+        Assert.Contains(snapshots, x => x.InvestorCategory == "Overall" && x.SubscriptionTimes == 24.21m && x.AvailabilityStatus == "Available");
+        Assert.Contains(snapshots, x => x.InvestorCategory == "Retail" && x.AvailabilityStatus == "NotProvidedBySource");
+    }
+
+    [Fact]
+    public void Map_UsesNestedUpstoxTimelineWhenTopLevelDatesAreMissing()
+    {
+        var record = _mapper.Map(
+            new UpstoxIpoSummary
+            {
+                Id = "nested-timeline-ipo",
+                Name = "Nested Timeline IPO",
+                Status = "open",
+                IssueType = "regular"
+            },
+            new UpstoxIpoDetail
+            {
+                Id = "nested-timeline-ipo",
+                Industry = "Plastic Products",
+                Timeline = new UpstoxIpoTimeline
+                {
+                    ApplicationStartDate = "2026-08-31",
+                    ApplicationEndDate = "2026-09-02",
+                    AllotmentDate = "2026-09-04",
+                    RefundInitiationDate = "2026-09-04",
+                    ListingDate = "2026-09-07"
+                }
+            },
+            DateTimeOffset.UnixEpoch);
+
+        Assert.Equal("Industry: Plastic Products", record.Description);
+        Assert.Equal(new DateTimeOffset(2026, 8, 31, 0, 0, 0, TimeSpan.Zero), record.OpenDate);
+        Assert.Equal(new DateTimeOffset(2026, 9, 2, 0, 0, 0, TimeSpan.Zero), record.CloseDate);
+        Assert.Equal(new DateTimeOffset(2026, 9, 4, 0, 0, 0, TimeSpan.Zero), record.AllotmentDate);
+        Assert.Equal(new DateTimeOffset(2026, 9, 4, 0, 0, 0, TimeSpan.Zero), record.RefundDate);
+        Assert.Equal(new DateTimeOffset(2026, 9, 7, 0, 0, 0, TimeSpan.Zero), record.ListingDate);
+    }
 }

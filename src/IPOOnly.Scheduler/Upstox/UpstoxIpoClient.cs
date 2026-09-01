@@ -12,7 +12,7 @@ public sealed class UpstoxIpoClient(HttpClient httpClient, IOptions<UpstoxOption
         NumberHandling = JsonNumberHandling.AllowReadingFromString
     };
 
-    public Task<UpstoxListResponse> GetIpoPageAsync(
+    public Task<UpstoxApiResponse<UpstoxListResponse>> GetIpoPageAsync(
         string status,
         int pageNumber,
         int pageSize,
@@ -22,12 +22,12 @@ public sealed class UpstoxIpoClient(HttpClient httpClient, IOptions<UpstoxOption
         return GetAsync<UpstoxListResponse>(path, cancellationToken);
     }
 
-    public Task<UpstoxDetailResponse> GetIpoDetailAsync(string id, CancellationToken cancellationToken)
+    public Task<UpstoxApiResponse<UpstoxDetailResponse>> GetIpoDetailAsync(string id, CancellationToken cancellationToken)
     {
         return GetAsync<UpstoxDetailResponse>($"ipos/{Uri.EscapeDataString(id)}", cancellationToken);
     }
 
-    private async Task<T> GetAsync<T>(string path, CancellationToken cancellationToken)
+    private async Task<UpstoxApiResponse<T>> GetAsync<T>(string path, CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, path);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", options.Value.AnalyticsToken);
@@ -36,8 +36,10 @@ public sealed class UpstoxIpoClient(HttpClient httpClient, IOptions<UpstoxOption
         using var response = await httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
 
-        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        return await JsonSerializer.DeserializeAsync<T>(stream, SerializerOptions, cancellationToken)
+        var rawJson = await response.Content.ReadAsStringAsync(cancellationToken);
+        var payload = JsonSerializer.Deserialize<T>(rawJson, SerializerOptions)
             ?? throw new InvalidOperationException("Upstox returned an empty response.");
+
+        return new UpstoxApiResponse<T>(payload, rawJson, path);
     }
 }
