@@ -1,4 +1,5 @@
 using IPOOnly.Scheduler;
+using IPOOnly.Scheduler.Documents;
 using IPOOnly.Scheduler.Persistence;
 using IPOOnly.Scheduler.Upstox;
 using Microsoft.Extensions.Configuration;
@@ -23,6 +24,12 @@ builder.Services
     .Validate(options => options.SyncIntervalMinutes > 0, "Sync interval must be positive.")
     .ValidateOnStart();
 
+builder.Services
+    .AddOptions<DocumentEnrichmentOptions>()
+    .Bind(builder.Configuration.GetSection(DocumentEnrichmentOptions.SectionName))
+    .Validate(options => options.MaxDocumentBytes > 0, "Document enrichment byte limit must be positive.")
+    .ValidateOnStart();
+
 builder.Services.AddSingleton(_ =>
 {
     var connectionString = builder.Configuration.GetConnectionString("IPOOnlyDatabase");
@@ -40,6 +47,10 @@ builder.Services.AddHttpClient<IUpstoxIpoClient, UpstoxIpoClient>((serviceProvid
     client.BaseAddress = options.BaseUrl;
 });
 
+builder.Services.AddHttpClient<IpoDocumentEnrichmentService>();
+builder.Services.AddSingleton<IpoOfferDocumentSelector>();
+builder.Services.AddSingleton<IPdfTextExtractor, PdfPigTextExtractor>();
+builder.Services.AddSingleton<IpoOfferDocumentParser>();
 builder.Services.AddSingleton<UpstoxIpoMapper>();
 builder.Services.AddSingleton<IpoRepository>();
 builder.Services.AddSingleton<IpoSyncService>();

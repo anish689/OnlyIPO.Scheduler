@@ -48,6 +48,22 @@ public sealed record IpoDocumentRecord(
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset UpdatedAtUtc);
 
+public sealed record IpoDocumentFactRecord(
+    string FactGroup,
+    string FactKey,
+    string Label,
+    string Value,
+    string? Unit,
+    string SourceDocumentType,
+    string SourceDocumentUrl,
+    int? PageNumber,
+    decimal ConfidenceScore,
+    string ValidationStatus,
+    string ExtractionMethod,
+    DateTimeOffset ExtractedAtUtc,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset UpdatedAtUtc);
+
 public sealed record IpoSubscriptionSnapshotRecord(
     string InvestorCategory,
     decimal? SubscriptionTimes,

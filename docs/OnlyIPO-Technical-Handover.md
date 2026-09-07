@@ -396,6 +396,7 @@ Normalized IPO detail tables:
 | --- | --- |
 | `IpoTimelineEvents` | One row per important IPO date such as open, close, allotment, refund, demat credit, and listing. |
 | `IpoDocuments` | One row per source document link such as DRHP or RHP. |
+| `IpoDocumentFacts` | Validated facts extracted from preferred offer documents such as RHP or DRHP. |
 | `IpoSubscriptionSnapshots` | One row per investor-category subscription value per sync timestamp. |
 | `IpoSourceSnapshots` | Raw source payload snapshots with a SHA-256 payload hash for diagnostics and future remapping. |
 
@@ -662,7 +663,37 @@ Field availability checks:
 - If dates are visible in the raw Upstox payload under `timeline`, they must map into the flat IPO read model and the normalized timeline events table.
 - If category-wise subscriptions such as retail, QIB, NII, or employee are absent from the Upstox payload, keep them as `NotProvidedBySource`; do not manufacture values from overall subscription.
 
-## 15. Security Notes
+## 15. RHP-First Document Enrichment
+
+Tracking issue: https://github.com/anish689/OnlyIPO/issues/27
+
+Source priority:
+
+1. RHP
+2. Prospectus/final prospectus when added as a future source
+3. DRHP only when no higher-priority document is available
+
+Implementation:
+
+- `IpoOfferDocumentSelector` chooses the preferred document.
+- `PdfPigTextExtractor` extracts text page-by-page from PDFs without requiring Poppler on the Mac.
+- `IpoOfferDocumentParser` applies reusable, conservative regex rules over normalized page text.
+- `IpoDocumentEnrichmentService` downloads the selected document, extracts pages, parses facts, and stores the resulting facts through `IpoRepository.ReplaceDocumentFactsAsync`.
+- Stored facts include group, key, label, value, optional unit, document type, source URL, page number, confidence, validation status, extraction method, and extraction timestamp.
+- Offer-structure facts require explicit units such as equity shares, crore, lakh, million, `Rs`, or `₹`.
+- Allocation facts require sane percentage values between 1% and 100%.
+- Organization facts reject generic table headers, legal boilerplate, email/contact fragments, and prose phrases; unsupported layouts are skipped until a dedicated parser test is added.
+- Latest local sync fetched/upserted 151 IPOs and retained 141 conservative RHP/DRHP document facts after data-quality cleanup.
+
+Accuracy guardrails:
+
+- Show only `Available` facts through the API/UI.
+- Keep source document and page reference with each displayed fact.
+- Do not manufacture category-wise subscription, allocation, GMP, or institutional investor data.
+- If a PDF layout is not recognized, skip extraction for that document and retain existing IPO data.
+- Add a parser regression test before supporting any new RHP/DRHP layout pattern.
+
+## 16. Security Notes
 
 Secrets currently required:
 
@@ -686,7 +717,7 @@ Unsafe storage:
 
 Rotate the Upstox token if it was accidentally shared outside a trusted local environment.
 
-## 16. Next Recommended Work
+## 17. Next Recommended Work
 
 Near-term:
 
@@ -704,7 +735,7 @@ Medium-term:
 4. Add retry/backoff around Upstox requests.
 5. Confirm written data redistribution permission from Upstox before public launch.
 
-## 17. Quick Start Checklist
+## 18. Quick Start Checklist
 
 Start backend:
 

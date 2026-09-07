@@ -55,6 +55,7 @@ DOTNET_ENVIRONMENT=Development dotnet run --project src/IPOOnly.Scheduler
 6. Populate normalized child data:
    - `IpoTimelineEvents`
    - `IpoDocuments`
+   - `IpoDocumentFacts`
    - `IpoSubscriptionSnapshots`
 7. Upsert by `Slug`, using the Upstox IPO id as the provider key.
 
@@ -71,6 +72,14 @@ Subscription category behavior:
 - `Retail`, `QIB`, `NII`, and `Employee` are currently stored as `NotProvidedBySource` because the current Upstox DTO does not provide category-wise values.
 
 The React app never receives the Upstox token. Public application data should continue to flow from the backend API.
+
+Offer document enrichment:
+
+- The scheduler prefers RHP, then future prospectus support, then DRHP.
+- PDF text is extracted with the no-cost `PdfPig` NuGet package, so local runs do not require Homebrew Poppler.
+- Parser rules are pattern-based and conservative. They emit facts only when a reusable rule crosses the configured confidence threshold.
+- Extracted facts keep source document type, source URL, page number, confidence score, validation status, and extraction method.
+- Unknown PDF layouts are skipped safely; the app keeps existing IPO data and does not show unverified facts.
 
 ## Verification
 
