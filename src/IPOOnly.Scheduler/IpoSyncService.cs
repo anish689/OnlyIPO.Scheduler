@@ -1,4 +1,5 @@
 using IPOOnly.Scheduler.Persistence;
+using IPOOnly.Scheduler.Documents;
 using IPOOnly.Scheduler.Upstox;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -11,6 +12,7 @@ public sealed class IpoSyncService(
     IUpstoxIpoClient client,
     UpstoxIpoMapper mapper,
     IpoRepository repository,
+    IpoDocumentEnrichmentService documentEnrichmentService,
     IOptions<SchedulerOptions> options,
     ILogger<IpoSyncService> logger)
 {
@@ -54,7 +56,9 @@ public sealed class IpoSyncService(
                             fetchedAt),
                         cancellationToken);
                     await repository.ReplaceTimelineEventsAsync(ipoId, mapper.MapTimeline(record, fetchedAt), cancellationToken);
-                    await repository.ReplaceDocumentsAsync(ipoId, mapper.MapDocuments(record, fetchedAt), cancellationToken);
+                    var documents = mapper.MapDocuments(record, fetchedAt);
+                    await repository.ReplaceDocumentsAsync(ipoId, documents, cancellationToken);
+                    await documentEnrichmentService.EnrichAsync(ipoId, documents, fetchedAt, cancellationToken);
                     await repository.InsertSubscriptionSnapshotsAsync(
                         ipoId,
                         mapper.MapSubscriptionSnapshots(record, fetchedAt),

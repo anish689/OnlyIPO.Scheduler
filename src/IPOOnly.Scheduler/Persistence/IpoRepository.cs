@@ -164,6 +164,68 @@ public sealed class IpoRepository(NpgsqlDataSource dataSource)
         }
     }
 
+    public async Task ReplaceDocumentFactsAsync(
+        Guid ipoId,
+        string sourceDocumentType,
+        IReadOnlyList<IpoDocumentFactRecord> facts,
+        CancellationToken cancellationToken)
+    {
+        const string deleteSql = """
+            DELETE FROM "IpoDocumentFacts"
+            WHERE "IpoId" = @IpoId AND "SourceDocumentType" = @SourceDocumentType;
+            """;
+        await using (var deleteCommand = dataSource.CreateCommand(deleteSql))
+        {
+            Add(deleteCommand, "IpoId", ipoId);
+            Add(deleteCommand, "SourceDocumentType", sourceDocumentType);
+            await deleteCommand.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        const string insertSql = """
+            INSERT INTO "IpoDocumentFacts" (
+                "Id", "IpoId", "FactGroup", "FactKey", "Label", "Value", "Unit",
+                "SourceDocumentType", "SourceDocumentUrl", "PageNumber", "ConfidenceScore",
+                "ValidationStatus", "ExtractionMethod", "ExtractedAtUtc", "CreatedAtUtc", "UpdatedAtUtc")
+            VALUES (
+                @Id, @IpoId, @FactGroup, @FactKey, @Label, @Value, @Unit,
+                @SourceDocumentType, @SourceDocumentUrl, @PageNumber, @ConfidenceScore,
+                @ValidationStatus, @ExtractionMethod, @ExtractedAtUtc, @CreatedAtUtc, @UpdatedAtUtc)
+            ON CONFLICT ("IpoId", "FactGroup", "FactKey", "SourceDocumentType") DO UPDATE SET
+                "Label" = EXCLUDED."Label",
+                "Value" = EXCLUDED."Value",
+                "Unit" = EXCLUDED."Unit",
+                "SourceDocumentUrl" = EXCLUDED."SourceDocumentUrl",
+                "PageNumber" = EXCLUDED."PageNumber",
+                "ConfidenceScore" = EXCLUDED."ConfidenceScore",
+                "ValidationStatus" = EXCLUDED."ValidationStatus",
+                "ExtractionMethod" = EXCLUDED."ExtractionMethod",
+                "ExtractedAtUtc" = EXCLUDED."ExtractedAtUtc",
+                "UpdatedAtUtc" = EXCLUDED."UpdatedAtUtc";
+            """;
+
+        foreach (var item in facts)
+        {
+            await using var command = dataSource.CreateCommand(insertSql);
+            Add(command, "Id", Guid.NewGuid());
+            Add(command, "IpoId", ipoId);
+            Add(command, "FactGroup", item.FactGroup);
+            Add(command, "FactKey", item.FactKey);
+            Add(command, "Label", item.Label);
+            Add(command, "Value", item.Value);
+            Add(command, "Unit", item.Unit);
+            Add(command, "SourceDocumentType", item.SourceDocumentType);
+            Add(command, "SourceDocumentUrl", item.SourceDocumentUrl);
+            Add(command, "PageNumber", item.PageNumber);
+            Add(command, "ConfidenceScore", item.ConfidenceScore);
+            Add(command, "ValidationStatus", item.ValidationStatus);
+            Add(command, "ExtractionMethod", item.ExtractionMethod);
+            Add(command, "ExtractedAtUtc", item.ExtractedAtUtc);
+            Add(command, "CreatedAtUtc", item.CreatedAtUtc);
+            Add(command, "UpdatedAtUtc", item.UpdatedAtUtc);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+    }
+
     public async Task InsertSubscriptionSnapshotsAsync(
         Guid ipoId,
         IReadOnlyList<IpoSubscriptionSnapshotRecord> snapshots,
