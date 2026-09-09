@@ -8,6 +8,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Npgsql;
+using IPOOnly.Scheduler.Tracking;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -54,6 +55,23 @@ builder.Services.AddSingleton<IpoOfferDocumentParser>();
 builder.Services.AddSingleton<UpstoxIpoMapper>();
 builder.Services.AddSingleton<IpoRepository>();
 builder.Services.AddSingleton<IpoSyncService>();
+builder.Services.AddOptions<TrackingOptions>().Bind(builder.Configuration.GetSection("Tracking"))
+    .Validate(x => x.RecentDays is >= 1 and <= 365 && x.RefreshHours is >= 1 and <= 168, "Tracking date window or interval is invalid.")
+    .ValidateOnStart();
+builder.Services.AddHttpClient<IMarketDataClient, UpstoxMarketClient>(client => client.Timeout = TimeSpan.FromSeconds(60));
+builder.Services.AddSingleton<ITrackingStore, TrackingRepository>();
+builder.Services.AddSingleton<TrackingSyncService>();
+builder.Services.AddSingleton<TrackingWorker>();
+
+if (args.Any(arg => arg == "--tracking-once"))
+{
+    using var host = builder.Build();
+    await host.StartAsync();
+    var result = await host.Services.GetRequiredService<TrackingWorker>().RunOnceAsync(CancellationToken.None);
+    if (result?.Failed > 0) Environment.ExitCode = 1;
+    await host.StopAsync();
+    return;
+}
 
 if (args.Any(arg => string.Equals(arg, "--run-once", StringComparison.OrdinalIgnoreCase)))
 {
@@ -65,6 +83,7 @@ if (args.Any(arg => string.Equals(arg, "--run-once", StringComparison.OrdinalIgn
 }
 
 builder.Services.AddHostedService<IpoSyncWorker>();
+builder.Services.AddHostedService(provider => provider.GetRequiredService<TrackingWorker>());
 
 await builder.Build().RunAsync();
 

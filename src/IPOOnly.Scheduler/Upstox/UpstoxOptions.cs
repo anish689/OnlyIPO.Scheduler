@@ -6,4 +6,5 @@ public sealed class UpstoxOptions
 
     public Uri BaseUrl { get; init; } = new("https://api.upstox.com/v2/");
     public string AnalyticsToken { get; init; } = string.Empty;
+    public string MarketDataToken { get; init; } = string.Empty;
 }
