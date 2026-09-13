@@ -85,3 +85,24 @@ PDF pages 4, 360, 4, 1 and 359 respectively. Qualiance also re-extracted correct
 SQL checks found zero published legacy allocations, zero published facts without
 valid page/source/value evidence, and no company mixing available document types.
 Final run totals and merge evidence are recorded in the PR validation comments.
+
+## Completed Refresh Validation
+Final full invocation exited 0: 159 fetched/upserted (10 open, 29 upcoming,
+14 closed, 106 listed). Older records not returned by this run were preserved.
+86 documents were processed, including documents yielding no supported facts;
+62 were skipped for unavailable, invalid, oversized or timed-out sources.
+11 IPOs did not enter document enrichment because no preferred document existed.
+This is not a claim that all issuer PDFs were successfully downloaded.
+
+Final database: 101 Available allocation facts, 84 Available offer facts, and
+5 legacy allocation facts still NeedsReview. Zero published facts lack valid
+page/source/value evidence; zero legacy-parser allocations are published.
+Qualiance NII remains not less than 15% after the full refresh.
+Post-refresh suites: frontend 81, API 78, scheduler 38 tests passed (197 total).
+Frontend lint/build passed. Public routes and protected-detail redirects smoke
+tested against local data. Google OAuth was not re-certified in this run.
+No price-tracking run was requested here; this invocation refreshes IPO/source
+documents, not daily listed-price candles.
+
+Local logs: /tmp/onlyipo-final-refresh.log. Test app: http://localhost:5173/.
+User authorized merge after these checks; PR comments record final merge results.
