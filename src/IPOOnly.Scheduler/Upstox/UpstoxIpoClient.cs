@@ -29,6 +29,20 @@ public sealed class UpstoxIpoClient(HttpClient httpClient, IOptions<UpstoxOption
 
     private async Task<UpstoxApiResponse<T>> GetAsync<T>(string path, CancellationToken cancellationToken)
     {
+        // GET requests are safe to retry after a transient connection reset or server error.
+        for (var attempt = 1; ; attempt++)
+        {
+            try { return await GetOnceAsync<T>(path, cancellationToken); }
+            catch (HttpRequestException error) when (attempt < 3 &&
+                (error.StatusCode is null || (int)error.StatusCode >= 500))
+            {
+                await Task.Delay(TimeSpan.FromSeconds(attempt), cancellationToken);
+            }
+        }
+    }
+
+    private async Task<UpstoxApiResponse<T>> GetOnceAsync<T>(string path, CancellationToken cancellationToken)
+    {
         using var request = new HttpRequestMessage(HttpMethod.Get, path);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", options.Value.AnalyticsToken);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));

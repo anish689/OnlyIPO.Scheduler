@@ -69,9 +69,13 @@ and preserves existing facts; caller cancellation still propagates. Three new
 tests cover stalled body, caller cancellation and oversized response. Scheduler
 suite now has 34 passing tests. No new service, secret or database schema.
 
-The listed pass is resumed with all four Scheduler:Statuses array entries set to
-listed for that invocation only (Distinct processes it once). Do not persist this
-override: ordinary runs must still include open, upcoming, closed and listed.
+An attempted listed-only configuration did not exclude the default status list;
+no such override is retained. The final invocation refreshes all four statuses.
+Repeated Upstox connection resets also exposed missing transient GET retries.
+The client now retries connection failures and HTTP 5xx at most three attempts,
+with bounded backoff. Invalid credentials are not retried; cancellation stops
+backoff. Four regression tests cover recovery, invalid credentials, cancellation
+and retry exhaustion. Scheduler suite now contains 38 tests.
 
 Live PDF cross-check: Rentomojo RHP matches extracted QIB not more than 50%, NII
 not less than 15%, retail not less than 35%; offer for sale up to 27,365,529 shares
