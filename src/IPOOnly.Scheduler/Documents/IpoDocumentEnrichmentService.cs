@@ -43,7 +43,7 @@ public sealed class IpoDocumentEnrichmentService(
                 preferred.DocumentType,
                 ipoId);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             logger.LogWarning(
                 exception,
@@ -55,6 +55,10 @@ public sealed class IpoDocumentEnrichmentService(
 
     private async Task<byte[]> DownloadAsync(string url, CancellationToken cancellationToken)
     {
+        // HeadersRead does not apply HttpClient.Timeout to the response body.
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(options.Value.DownloadTimeoutSeconds));
+        cancellationToken = deadline.Token;
         using var response = await httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         response.EnsureSuccessStatusCode();
 
@@ -64,11 +68,17 @@ public sealed class IpoDocumentEnrichmentService(
             throw new InvalidDataException($"Document exceeds configured limit of {options.Value.MaxDocumentBytes} bytes.");
         }
 
-        var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
-        if (bytes.Length > options.Value.MaxDocumentBytes)
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var buffer = new MemoryStream();
+        var chunk = new byte[16 * 1024];
+        int read;
+        while ((read = await stream.ReadAsync(chunk, cancellationToken)) != 0)
         {
-            throw new InvalidDataException($"Document exceeds configured limit of {options.Value.MaxDocumentBytes} bytes.");
+            if (buffer.Length + read > options.Value.MaxDocumentBytes)
+                throw new InvalidDataException($"Document exceeds configured limit of {options.Value.MaxDocumentBytes} bytes.");
+            buffer.Write(chunk, 0, read);
         }
+        var bytes = buffer.ToArray();
 
         if (!LooksLikePdf(bytes))
         {

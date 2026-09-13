@@ -20,18 +20,44 @@ public sealed class IpoOfferDocumentParser
             var text = Normalize(page.Text);
             AddFirstMatch(facts, document, page.PageNumber, text, "offer-structure", "fresh-issue", "Fresh issue", @"fresh\s+issue(?:\s+of)?\s+(?<value>(?:up\s+to\s+)?(?:rs\.?|₹)?\s?[0-9,]+(?:\.[0-9]+)?\s*(?:crore|lakhs?|million|equity\s+shares?)?)", null, 0.78m, extractedAtUtc, IsValidOfferValue);
             AddFirstMatch(facts, document, page.PageNumber, text, "offer-structure", "offer-for-sale", "Offer for sale", @"offer\s+for\s+sale(?:\s+of)?\s+(?<value>(?:up\s+to\s+)?(?:rs\.?|₹)?\s?[0-9,]+(?:\.[0-9]+)?\s*(?:crore|lakhs?|million|equity\s+shares?)?)", null, 0.76m, extractedAtUtc, IsValidOfferValue);
-            AddFirstMatch(facts, document, page.PageNumber, text, "issue-allocation", "qib-allocation", "QIB allocation", @"qualified\s+institutional\s+buyers?.{0,80}?(?<value>[0-9]+(?:\.[0-9]+)?\s?%)", "percentage", 0.78m, extractedAtUtc, IsValidAllocationPercentage);
-            AddFirstMatch(facts, document, page.PageNumber, text, "issue-allocation", "nii-allocation", "NII allocation", @"non[-\s]?institutional\s+(?:investors?|bidders?).{0,80}?(?<value>[0-9]+(?:\.[0-9]+)?\s?%)", "percentage", 0.78m, extractedAtUtc, IsValidAllocationPercentage);
-            AddFirstMatch(facts, document, page.PageNumber, text, "issue-allocation", "retail-allocation", "Retail allocation", @"retail\s+(?:individual\s+)?(?:investors?|bidders?).{0,80}?(?<value>[0-9]+(?:\.[0-9]+)?\s?%)", "percentage", 0.78m, extractedAtUtc, IsValidAllocationPercentage);
             AddFirstMatch(facts, document, page.PageNumber, text, "registrar", "registrar-to-offer", "Registrar to the offer", @"registrar\s+to\s+the\s+(?:offer|issue)\s*:\s*(?<value>[^.]{5,160})", null, 0.82m, extractedAtUtc, IsValidOrganizationValue);
             AddFirstMatch(facts, document, page.PageNumber, text, "lead-managers", "book-running-lead-managers", "Book running lead managers", @"book\s+running\s+lead\s+managers?\s*:\s*(?<value>[^.]{8,220})", null, 0.74m, extractedAtUtc, IsValidOrganizationValue);
         }
+
+        AddAllocation(facts, document, pages, "qib-allocation", "QIB allocation", @"(?:qualified\s+institutional\s+buyers?|QIBs)\b", extractedAtUtc);
+        AddAllocation(facts, document, pages, "nii-allocation", "NII allocation", @"non[-\s]?institutional\s+(?:investors?|bidders?)\b", extractedAtUtc);
+        AddAllocation(facts, document, pages, "retail-allocation", "Retail allocation", @"retail\s+(?:individual\s+)?(?:investors?|bidders?)\b", extractedAtUtc);
 
         return facts
             .GroupBy(fact => new { fact.FactGroup, fact.FactKey })
             .Select(group => group.OrderByDescending(fact => fact.ConfidenceScore).ThenBy(fact => fact.PageNumber).First())
             .Where(fact => fact.ConfidenceScore >= 0.70m)
             .ToList();
+    }
+
+    private static void AddAllocation(List<IpoDocumentFactRecord> facts, IpoOfferDocument document,
+        IReadOnlyList<PdfPageText> pages, string key, string label, string category, DateTimeOffset at)
+    {
+        // Explicit grammar prevents a category from consuming the next category's percentage.
+        const string value = @"(?<value>(?:(?:not\s+less\s+than|not\s+more\s+than|at\s+least|up\s+to)\s+)?[0-9]+(?:\.[0-9]+)?\s*%)";
+        var patterns = new[] {
+            category + @"\s+shall\s+be\s+allocated\s+" + value + @"\s+of\s+the\s+net\s+(?:offer|issue)\b",
+            value + @"\s+of\s+the\s+net\s+(?:offer|issue)\s+shall\s+be\s+(?:available\s+for\s+allocation|allotted)(?:\s+on\s+a\s+proportionate\s+basis)?\s+to\s+" + category
+        };
+        var candidates = new List<(string Value, int Page)>();
+        foreach (var page in pages)
+        foreach (var pattern in patterns)
+        foreach (Match match in Regex.Matches(Normalize(page.Text), pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)))
+        {
+            var candidate = Regex.Replace(CleanValue(match.Groups["value"].Value), @"\s+%", "%").ToLowerInvariant();
+            var number = Regex.Match(candidate, @"[0-9]+(?:\.[0-9]+)?%$").Value;
+            if (IsValidAllocationPercentage(number)) candidates.Add((candidate, page.PageNumber));
+        }
+        // Conflicting statements require review, not an arbitrary first-page winner.
+        if (candidates.Select(x => x.Value).Distinct(StringComparer.OrdinalIgnoreCase).Count() != 1) return;
+        var selected = candidates.OrderBy(x => x.Page).First();
+        facts.Add(new IpoDocumentFactRecord("issue-allocation", key, label, selected.Value, "percentage",
+            document.DocumentType, document.Url, selected.Page, 0.78m, Available, "RhpAllocationStatementV2", at, at, at));
     }
 
     private static void AddFirstMatch(
