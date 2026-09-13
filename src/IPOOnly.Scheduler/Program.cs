@@ -29,6 +29,7 @@ builder.Services
     .AddOptions<DocumentEnrichmentOptions>()
     .Bind(builder.Configuration.GetSection(DocumentEnrichmentOptions.SectionName))
     .Validate(options => options.MaxDocumentBytes > 0, "Document enrichment byte limit must be positive.")
+    .Validate(options => options.DownloadTimeoutSeconds is >= 1 and <= 300, "Document download timeout must be between 1 and 300 seconds.")
     .ValidateOnStart();
 
 builder.Services.AddSingleton(_ =>

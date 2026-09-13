@@ -54,3 +54,30 @@ QIB not more than 50%, fresh issue unchanged. No paid API or schema change.
 Review locally at http://localhost:5173/ipos/qualiance-international-limited-ipo.
 API health: http://localhost:5089/health. No new Postman endpoint required.
 Do not merge until local review is complete.
+
+## Live Refresh Follow-up
+The user authorized refresh, retesting and merge on 13 September 2026.
+Run locally with DOTNET_ENVIRONMENT=Development so existing user-secrets load.
+An Upstox connection reset interrupted the first attempt. A subsequent pass
+completed open/upcoming/closed before stalling on an issuer PDF response body.
+HeadersRead only bounds the headers with HttpClient.Timeout, not the body.
+
+DocumentEnrichment.DownloadTimeoutSeconds now defaults to 30 (validated 1-300).
+A linked deadline covers headers and body; streaming enforces MaxDocumentBytes
+without buffering an unbounded download. A document-specific timeout logs a skip
+and preserves existing facts; caller cancellation still propagates. Three new
+tests cover stalled body, caller cancellation and oversized response. Scheduler
+suite now has 34 passing tests. No new service, secret or database schema.
+
+The listed pass is resumed with all four Scheduler:Statuses array entries set to
+listed for that invocation only (Distinct processes it once). Do not persist this
+override: ordinary runs must still include open, upcoming, closed and listed.
+
+Live PDF cross-check: Rentomojo RHP matches extracted QIB not more than 50%, NII
+not less than 15%, retail not less than 35%; offer for sale up to 27,365,529 shares
+and fresh issue up to INR 1,500 million. Source:
+https://www.axiscapital.co.in/contents/Rentomojo%20Limited%20-%20RHP-1788498517.pdf
+PDF pages 4, 360, 4, 1 and 359 respectively. Qualiance also re-extracted correctly.
+SQL checks found zero published legacy allocations, zero published facts without
+valid page/source/value evidence, and no company mixing available document types.
+Final run totals and merge evidence are recorded in the PR validation comments.
