@@ -18,3 +18,12 @@ INSERT INTO "NewsSources" (
 
 -- Emergency unpublish from all fresh API reads:
 -- UPDATE "NewsSources" SET "Enabled"=false WHERE "Id"=:source_id;
+
+-- Upstox adapter values for the INSERT above (do not infer approval):
+-- source_name: Upstox
+-- kind: news
+-- feed_url: https://api.upstox.com/v2/news
+-- article_host: upstox.com
+-- Set RetentionDays=7. Leave DescriptionAllowed/PreviewAllowed false unless
+-- expressly permitted. This exact FeedUrl selects the JSON adapter; verified
+-- ListedInstruments rows provide keys. Never include a token in FeedUrl.
