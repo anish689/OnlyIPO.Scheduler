@@ -13,6 +13,7 @@ public sealed class IpoSyncService(
     UpstoxIpoMapper mapper,
     IpoRepository repository,
     IpoDocumentEnrichmentService documentEnrichmentService,
+    Financials.FinancialEnrichmentService financialEnrichmentService,
     IOptions<SchedulerOptions> options,
     ILogger<IpoSyncService> logger)
 {
@@ -59,6 +60,7 @@ public sealed class IpoSyncService(
                     var documents = mapper.MapDocuments(record, fetchedAt);
                     await repository.ReplaceDocumentsAsync(ipoId, documents, cancellationToken);
                     await documentEnrichmentService.EnrichAsync(ipoId, documents, fetchedAt, cancellationToken);
+                    await financialEnrichmentService.EnrichAsync(ipoId, summary, detail.Payload.Data, cancellationToken);
                     await repository.InsertSubscriptionSnapshotsAsync(
                         ipoId,
                         mapper.MapSubscriptionSnapshots(record, fetchedAt),
