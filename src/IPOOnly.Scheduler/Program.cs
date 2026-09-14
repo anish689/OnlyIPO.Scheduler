@@ -12,6 +12,32 @@ using IPOOnly.Scheduler.Tracking;
 
 var builder = Host.CreateApplicationBuilder(args);
 
+// News runs independently and never requires an Upstox token.
+if (args.Any(x => new[] { "--news-once", "--news-worker", "--news-review", "--news-publish", "--news-withdraw" }.Contains(x)))
+{
+    builder.Services.AddSingleton(_ => new NpgsqlDataSourceBuilder(
+        builder.Configuration.GetConnectionString("IPOOnlyDatabase") ?? throw new InvalidOperationException("Database connection required.")).Build());
+    builder.Services.AddSingleton<IPOOnly.Scheduler.News.INewsStore, IPOOnly.Scheduler.News.NewsStore>();
+    builder.Services.AddSingleton<IPOOnly.Scheduler.News.INewsFeed, IPOOnly.Scheduler.News.NewsFeed>();
+    builder.Services.AddSingleton<IPOOnly.Scheduler.News.NewsWorker>();
+    if (args.Contains("--news-worker"))
+    {
+        builder.Services.AddHostedService(provider => provider.GetRequiredService<IPOOnly.Scheduler.News.NewsWorker>());
+        await builder.Build().RunAsync();
+    }
+    else
+    {
+        using var host = builder.Build();
+        await host.StartAsync();
+        if (args.Contains("--news-once"))
+            Environment.ExitCode = await host.Services.GetRequiredService<IPOOnly.Scheduler.News.NewsWorker>().RunOnceAsync(CancellationToken.None) > 0 ? 1 : 0;
+        else
+            await IPOOnly.Scheduler.News.NewsAdmin.RunAsync(host.Services.GetRequiredService<NpgsqlDataSource>(), args, CancellationToken.None);
+        await host.StopAsync();
+    }
+    return;
+}
+
 builder.Services
     .AddOptions<UpstoxOptions>()
     .Bind(builder.Configuration.GetSection(UpstoxOptions.SectionName))
