@@ -12,6 +12,51 @@ using IPOOnly.Scheduler.Tracking;
 
 var builder = Host.CreateApplicationBuilder(args);
 
+// RSS and review remain independent; only the Upstox news adapter requires its token.
+if (args.Any(x => new[] { "--news-once", "--news-worker", "--news-review", "--news-publish", "--news-withdraw", "--news-upstox-check" }.Contains(x)))
+{
+    builder.Services.AddSingleton(_ => new NpgsqlDataSourceBuilder(
+        builder.Configuration.GetConnectionString("IPOOnlyDatabase") ?? throw new InvalidOperationException("Database connection required.")).Build());
+    builder.Services.AddSingleton<IPOOnly.Scheduler.News.INewsStore, IPOOnly.Scheduler.News.NewsStore>();
+    builder.Services.AddSingleton<IPOOnly.Scheduler.News.NewsFeed>();
+    builder.Services.AddSingleton<IPOOnly.Scheduler.News.INewsInstruments, IPOOnly.Scheduler.News.NewsInstruments>();
+    builder.Services.AddHttpClient<IPOOnly.Scheduler.News.UpstoxNewsFeed>(client => client.Timeout = Timeout.InfiniteTimeSpan)
+        .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false, UseProxy = false });
+    builder.Services.AddSingleton<IPOOnly.Scheduler.News.INewsFeed, IPOOnly.Scheduler.News.NewsFeedRouter>();
+    builder.Services.AddSingleton<IPOOnly.Scheduler.News.NewsWorker>();
+    if (args.Contains("--news-worker"))
+    {
+        builder.Services.AddHostedService(provider => provider.GetRequiredService<IPOOnly.Scheduler.News.NewsWorker>());
+        await builder.Build().RunAsync();
+    }
+    else
+    {
+        using var host = builder.Build();
+        await host.StartAsync();
+        if (args.Contains("--news-upstox-check"))
+        {
+            try
+            {
+                var source = new IPOOnly.Scheduler.News.NewsSource(Guid.Empty,
+                    IPOOnly.Scheduler.News.UpstoxNewsFeed.Endpoint, "upstox.com", false, null, null, 7);
+                var batch = await host.Services.GetRequiredService<IPOOnly.Scheduler.News.UpstoxNewsFeed>().ReadAsync(source, CancellationToken.None);
+                Console.WriteLine($"Upstox news check: {batch.Entries.Count} unique eligible articles; {batch.Rejected} rejected. Nothing stored or published.");
+            }
+            catch (Exception error) when (error is HttpRequestException or InvalidDataException or OperationCanceledException)
+            {
+                Console.WriteLine("Upstox news check failed. Verify token access, response contract and request budget; nothing published.");
+                Environment.ExitCode = 1;
+            }
+        }
+        else if (args.Contains("--news-once"))
+            Environment.ExitCode = await host.Services.GetRequiredService<IPOOnly.Scheduler.News.NewsWorker>().RunOnceAsync(CancellationToken.None) > 0 ? 1 : 0;
+        else
+            await IPOOnly.Scheduler.News.NewsAdmin.RunAsync(host.Services.GetRequiredService<NpgsqlDataSource>(), args, CancellationToken.None);
+        await host.StopAsync();
+    }
+    return;
+}
+
 builder.Services
     .AddOptions<UpstoxOptions>()
     .Bind(builder.Configuration.GetSection(UpstoxOptions.SectionName))
