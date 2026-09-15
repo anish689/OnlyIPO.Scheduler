@@ -26,7 +26,25 @@ Replace the slug with an existing Upstox-sourced IPO. Commands have a three-minu
 deadline and nonzero failure exit code. Regular IPO sync also supports the feature
 when explicitly enabled, skipping successful sets younger than 24 hours. Empty
 coverage has no negative cache yet; consider provider traffic before enabling it.
-Only Qualiance and Maharaja & Speedex were backfilled for the local review.
+The initial two-company review has been superseded by a catalogue-wide backfill.
+
+```sh
+DOTNET_ENVIRONMENT=Development Financials__Enabled=true dotnet run --project src/IPOOnly.Scheduler -- --financials-backfill
+```
+
+This command has a 45-minute deadline and runs sequentially with 750 ms between
+companies. It reports every attempted company, retains successful writes if a later
+company fails, and exits nonzero when failures occur. HTTP 401/403/429 stop the batch.
+Missing coverage is reported separately from request failures. This is an explicit
+backfill command, not a new OS schedule; normal refresh still requires the feature flag.
+
+Both single-company and batch selection now accept only IPO list/detail snapshots.
+Tracking snapshots share SourceName=Upstox but use market:<instrument-id>; selecting
+the latest snapshot without checking its endpoint caused HTTP 400 for many companies.
+The corrected run attempted 174 companies: 140 populated, 33 unavailable, one invalid
+PDF response. Raksan and ESDS now contain four annual periods. The batch therefore
+returned nonzero, correctly: complete coverage is NOT claimed. See the backend
+`docs/financial-coverage-review.md` for outstanding RHP/DRHP limitations.
 
 RHP supports explicit same-page annual statements, basis/units/full dates and aligned
 numeric rows. Unsupported/scanned layouts, conflicting/footnoted values and unapproved
