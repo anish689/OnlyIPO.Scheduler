@@ -76,6 +76,8 @@ public sealed class UpstoxIpoSummary
 
 public sealed class UpstoxIpoDetail
 {
+    [JsonPropertyName("isin")]
+    public string? Isin { get; init; }
     [JsonPropertyName("id")]
     public string Id { get; init; } = string.Empty;
 

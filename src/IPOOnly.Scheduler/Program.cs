@@ -10,7 +10,7 @@ using Microsoft.Extensions.Options;
 using Npgsql;
 using IPOOnly.Scheduler.Tracking;
 
-var builder = Host.CreateApplicationBuilder(args);
+var builder = Host.CreateApplicationBuilder(args.Where(x => x is not ("--financials-once" or "--financials-preview" or "--financials-backfill")).ToArray());
 
 // RSS and review remain independent; only the Upstox news adapter requires its token.
 if (args.Any(x => new[] { "--news-once", "--news-worker", "--news-review", "--news-publish", "--news-withdraw", "--news-upstox-check" }.Contains(x)))
@@ -95,6 +95,12 @@ builder.Services.AddHttpClient<IUpstoxIpoClient, UpstoxIpoClient>((serviceProvid
 });
 
 builder.Services.AddHttpClient<IpoDocumentEnrichmentService>();
+builder.Services.AddHttpClient<IPOOnly.Scheduler.Financials.UpstoxFinancialClient>(client => { client.Timeout = TimeSpan.FromSeconds(30); client.MaxResponseContentBufferSize = 2_000_000; })
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+builder.Services.AddHttpClient<IPOOnly.Scheduler.Financials.FinancialEnrichmentService>(client => client.Timeout = TimeSpan.FromSeconds(45))
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+builder.Services.AddSingleton<IPOOnly.Scheduler.Financials.FinancialStore>();
+builder.Services.AddSingleton<IPOOnly.Scheduler.Financials.RhpFinancialParser>();
 builder.Services.AddSingleton<IpoOfferDocumentSelector>();
 builder.Services.AddSingleton<IPdfTextExtractor, PdfPigTextExtractor>();
 builder.Services.AddSingleton<IpoOfferDocumentParser>();
@@ -108,6 +114,42 @@ builder.Services.AddHttpClient<IMarketDataClient, UpstoxMarketClient>(client => 
 builder.Services.AddSingleton<ITrackingStore, TrackingRepository>();
 builder.Services.AddSingleton<TrackingSyncService>();
 builder.Services.AddSingleton<TrackingWorker>();
+
+if (args.Contains("--financials-once") || args.Contains("--financials-preview") || args.Contains("--financials-backfill"))
+{
+    using var host = builder.Build();
+    await host.StartAsync();
+    using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(args.Contains("--financials-backfill") ? 45 : 3));
+    try
+    {
+        if (args.Contains("--financials-backfill"))
+        {
+            if (!builder.Configuration.GetValue<bool>("Financials:Enabled")) throw new InvalidOperationException("Enable Financials after applying migrations.");
+            var db = host.Services.GetRequiredService<NpgsqlDataSource>();
+            var targets = await IPOOnly.Scheduler.Financials.FinancialBatch.TargetsAsync(db, deadline.Token);
+            var result = await IPOOnly.Scheduler.Financials.FinancialBatch.RunAsync(targets,
+                (target, token) => IPOOnly.Scheduler.Financials.FinancialBatch.RefreshAsync(target,
+                    host.Services.GetRequiredService<IUpstoxIpoClient>(),
+                    host.Services.GetRequiredService<IPOOnly.Scheduler.Financials.FinancialEnrichmentService>(),
+                    host.Services.GetRequiredService<IPOOnly.Scheduler.Financials.FinancialStore>(), token),
+                Console.WriteLine, TimeSpan.FromMilliseconds(750), deadline.Token);
+            if (result.Failed > 0) Environment.ExitCode = 1;
+        }
+        else
+        await IPOOnly.Scheduler.Financials.FinancialCommand.RunAsync(
+            host.Services.GetRequiredService<NpgsqlDataSource>(), host.Services.GetRequiredService<IUpstoxIpoClient>(),
+            host.Services.GetRequiredService<IPOOnly.Scheduler.Financials.FinancialEnrichmentService>(),
+            host.Services.GetRequiredService<IPOOnly.Scheduler.Financials.FinancialStore>(), builder.Configuration,
+            args.Contains("--financials-preview"), deadline.Token);
+    }
+    catch (Exception error)
+    {
+        Console.WriteLine($"Financial refresh failed ({IPOOnly.Scheduler.Financials.FinancialBatch.FailureCode(error)}); stored data retained. Check configuration and source access.");
+        Environment.ExitCode = 1;
+    }
+    await host.StopAsync();
+    return;
+}
 
 if (args.Any(arg => arg == "--tracking-once"))
 {
