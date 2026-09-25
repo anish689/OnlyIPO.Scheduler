@@ -1,0 +1,54 @@
+name: Staging data refresh (opt-in)
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: One-shot task (staging only)
+        type: choice
+        options: [ipo, tracking]
+        default: ipo
+        required: true
+  schedule:
+    # UTC: 09:47 and 18:47 India time. Best effort, not a freshness SLA.
+    - cron: '17 4,13 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: onlyipo-staging-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    if: vars.STAGING_SCHEDULER_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    environment: staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Publish one-shot worker
+        run: dotnet publish src/IPOOnly.Scheduler/IPOOnly.Scheduler.csproj -c Release -o out
+      - name: Refresh staging
+        shell: bash
+        env:
+          DOTNET_ENVIRONMENT: Staging
+          ConnectionStrings__IPOOnlyDatabase: ${{ secrets.STAGING_DATABASE_CONNECTION }}
+          Upstox__AnalyticsToken: ${{ secrets.STAGING_UPSTOX_TOKEN }}
+          DocumentEnrichment__Enabled: 'false'
+          Financials__Enabled: 'false'
+          TASK: ${{ inputs.task || 'ipo' }}
+        run: |
+          set -euo pipefail
+          test -n "$ConnectionStrings__IPOOnlyDatabase" || { echo 'Missing staging database secret'; exit 1; }
+          test -n "$Upstox__AnalyticsToken" || { echo 'Missing staging provider secret'; exit 1; }
+          cd out
+          case "$TASK" in
+            ipo) dotnet IPOOnly.Scheduler.dll --run-once ;;
+            tracking) dotnet IPOOnly.Scheduler.dll --tracking-once ;;
+            *) echo 'Unsupported task'; exit 1 ;;
+          esac
