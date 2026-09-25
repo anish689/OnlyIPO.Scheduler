@@ -33,6 +33,16 @@ jobs:
           dotnet-version: '8.0.x'
       - name: Publish one-shot worker
         run: dotnet publish src/IPOOnly.Scheduler/IPOOnly.Scheduler.csproj -c Release -o out
+      - name: Prepare verified Supabase CA
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
+            --connect-timeout 15 --max-time 60 \
+            https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt \
+            --output /tmp/onlyipo-supabase-ca.crt
+          echo '700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7  /tmp/onlyipo-supabase-ca.crt' | sha256sum --check --status
+          openssl x509 -in /tmp/onlyipo-supabase-ca.crt -noout -checkend 86400
       - name: Refresh staging
         shell: bash
         env:
