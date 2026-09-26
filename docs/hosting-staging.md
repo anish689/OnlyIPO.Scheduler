@@ -14,6 +14,18 @@ this workflow, not other processes. Use Supabase session pooler port 5432 for
 tracking's session advisory lock, TLS verification and small Npgsql pool size.
 Do not use transaction mode or the Supabase administrator as the runtime role.
 
+The staging connection secret must include `SSL Mode=VerifyFull;Root
+Certificate=/tmp/onlyipo-supabase-ca.crt;Maximum Pool Size=5`. The workflow
+downloads the public CA from the link supplied by the project's Supabase
+Database Settings and checks its pinned SHA-256 and expiry before the worker
+receives credentials. A changed or unavailable certificate fails the run;
+review a provider rotation before updating the pin. Never disable TLS validation
+to work around a failure. Render uses a different path, `/etc/secrets/`, so do
+not reuse its connection string for Actions.
+
+This follow-up is part of anish689/OnlyIPO#47. The runtime staging roles and
+15 migrations have been verified; no hosted scheduler run has completed yet.
+
 Two daily IPO refreshes; tracking manual initially. Ten-minute timeout. PDF and
 financial ingestion disabled in the free recurring job; those need a bounded
 manual plan. Monitor failures and stale data. Never copy production users or
