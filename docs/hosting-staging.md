@@ -28,7 +28,16 @@ not reuse its connection string for Actions.
 This follow-up is part of anish689/OnlyIPO#47. The runtime staging roles and
 15 migrations have been verified; no hosted scheduler run has completed yet.
 
-Two daily IPO refreshes; tracking manual initially. Ten-minute timeout. PDF and
+The initial manual run reached its ten-minute limit while successfully fetching
+provider records. Writes are incremental, so that run must not be described as
+a completed catalogue refresh. IPO refresh now runs four sequential jobs, one
+per status (open, upcoming, closed, listed), each with a ten-minute limit.
+Fail-fast is disabled so one failed status does not prevent the others. All four
+must pass before calling an IPO refresh complete. Tracking remains one job.
+The maximum IPO run budget is now 40 runner minutes, not 10; check the private
+repository's included Actions allowance before enabling recurring runs.
+
+Two daily IPO refreshes remain opt-in; tracking manual initially. PDF and
 financial ingestion disabled in the free recurring job; those need a bounded
 manual plan. Monitor failures and stale data. Never copy production users or
 print secrets. Do not make this private repository public for free runner time.
