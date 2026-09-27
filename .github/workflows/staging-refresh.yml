@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   refresh:
-    if: vars.STAGING_SCHEDULER_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || vars.STAGING_SCHEDULER_ENABLED == 'true')
     environment: staging
     runs-on: ubuntu-latest
     timeout-minutes: 10
