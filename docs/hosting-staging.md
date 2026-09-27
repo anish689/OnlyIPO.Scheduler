@@ -5,7 +5,9 @@ Authoritative release runbook: OnlyIPO API repository,
 `docs/hosting-phase-h1-release.md`.
 
 `.github/workflows/staging-refresh.yml` requires main, a `staging` GitHub
-environment, its two scoped secrets, and the explicit repository opt-in variable.
+environment and its two scoped secrets. Manual dispatch on main is allowed
+without the repository opt-in variable; recurring runs require the explicit
+`STAGING_SCHEDULER_ENABLED=true` variable.
 It cannot run automatically merely because this PR merges. Keep opt-in false
 until migrations, least-privilege connection, token and account quota are checked.
 
