@@ -66,6 +66,9 @@ builder.Services
 builder.Services
     .AddOptions<SchedulerOptions>()
     .Bind(builder.Configuration.GetSection(SchedulerOptions.SectionName))
+    .Validate(options => options.Statuses.Length > 0 && options.Statuses.All(status =>
+        new[] { "open", "upcoming", "closed", "listed" }.Contains(status, StringComparer.OrdinalIgnoreCase)),
+        "At least one supported IPO status is required.")
     .Validate(options => options.PageSize is > 0 and <= 30, "Page size must be between 1 and 30.")
     .Validate(options => options.SyncIntervalMinutes > 0, "Sync interval must be positive.")
     .ValidateOnStart();

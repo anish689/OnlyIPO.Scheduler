@@ -58,10 +58,10 @@ jobs:
           Financials__Enabled: 'false'
           TASK: ${{ inputs.task || 'ipo' }}
           # Override every default array slot; the worker deduplicates statuses.
-          Scheduler__Statuses__0: ${{ matrix.status }}
-          Scheduler__Statuses__1: ${{ matrix.status }}
-          Scheduler__Statuses__2: ${{ matrix.status }}
-          Scheduler__Statuses__3: ${{ matrix.status }}
+          Scheduler__Statuses__0: ${{ matrix.status == 'tracking' && 'listed' || matrix.status }}
+          Scheduler__Statuses__1: ${{ matrix.status == 'tracking' && 'listed' || matrix.status }}
+          Scheduler__Statuses__2: ${{ matrix.status == 'tracking' && 'listed' || matrix.status }}
+          Scheduler__Statuses__3: ${{ matrix.status == 'tracking' && 'listed' || matrix.status }}
         run: |
           set -euo pipefail
           test -n "$ConnectionStrings__IPOOnlyDatabase" || { echo 'Missing staging database secret'; exit 1; }
