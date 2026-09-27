@@ -34,6 +34,11 @@ a completed catalogue refresh. IPO refresh now runs four sequential jobs, one
 per status (open, upcoming, closed, listed), each with a ten-minute limit.
 Fail-fast is disabled so one failed status does not prevent the others. All four
 must pass before calling an IPO refresh complete. Tracking remains one job.
+The first partitioned run (36303892724) exposed a configuration-binding bug:
+the binder appended configured statuses to the prepopulated options array.
+Defaults now live only in appsettings.json, with startup validation and five
+regression cases for scoped and full-catalogue binding. Failed/timed-out runs
+are not release validation, even when they have written some valid records.
 The maximum IPO run budget is now 40 runner minutes, not 10; check the private
 repository's included Actions allowance before enabling recurring runs.
 

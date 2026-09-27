@@ -4,7 +4,8 @@ public sealed class SchedulerOptions
 {
     public const string SectionName = "Scheduler";
 
-    public string[] Statuses { get; init; } = ["open", "upcoming", "closed", "listed"];
+    // Defaults live in appsettings.json; binding appends to a prepopulated array.
+    public string[] Statuses { get; init; } = [];
     public int PageSize { get; init; } = 30;
     public int SyncIntervalMinutes { get; init; } = 10;
     public int JitterMaxSeconds { get; init; } = 45;
