@@ -26,6 +26,11 @@ jobs:
     environment: staging
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        status: ${{ fromJSON(inputs.task == 'tracking' && '["tracking"]' || '["open","upcoming","closed","listed"]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -52,6 +57,11 @@ jobs:
           DocumentEnrichment__Enabled: 'false'
           Financials__Enabled: 'false'
           TASK: ${{ inputs.task || 'ipo' }}
+          # Override every default array slot; the worker deduplicates statuses.
+          Scheduler__Statuses__0: ${{ matrix.status }}
+          Scheduler__Statuses__1: ${{ matrix.status }}
+          Scheduler__Statuses__2: ${{ matrix.status }}
+          Scheduler__Statuses__3: ${{ matrix.status }}
         run: |
           set -euo pipefail
           test -n "$ConnectionStrings__IPOOnlyDatabase" || { echo 'Missing staging database secret'; exit 1; }
