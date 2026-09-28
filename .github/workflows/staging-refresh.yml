@@ -30,7 +30,7 @@ jobs:
       fail-fast: false
       max-parallel: 1
       matrix:
-        status: ${{ fromJSON(inputs.task == 'tracking' && '["tracking"]' || '["open","upcoming","closed","listed"]') }}
+        status: ${{ fromJSON(inputs.task == 'tracking' && '["tracking"]' || github.event_name == 'schedule' && '["open","upcoming","closed","listed","tracking"]' || '["open","upcoming","closed","listed"]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -56,7 +56,9 @@ jobs:
           Upstox__AnalyticsToken: ${{ secrets.STAGING_UPSTOX_TOKEN }}
           DocumentEnrichment__Enabled: 'false'
           Financials__Enabled: 'false'
-          TASK: ${{ inputs.task || 'ipo' }}
+          # Staging ingestion role intentionally has no access to user watchlists.
+          Tracking__IncludeWatchlisted: 'false'
+          TASK: ${{ matrix.status == 'tracking' && 'tracking' || 'ipo' }}
           # Override every default array slot; the worker deduplicates statuses.
           Scheduler__Statuses__0: ${{ matrix.status == 'tracking' && 'listed' || matrix.status }}
           Scheduler__Statuses__1: ${{ matrix.status == 'tracking' && 'listed' || matrix.status }}

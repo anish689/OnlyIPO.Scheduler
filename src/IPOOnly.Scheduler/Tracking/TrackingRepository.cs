@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Npgsql;
 using NpgsqlTypes;
+using Microsoft.Extensions.Options;
 
 namespace IPOOnly.Scheduler.Tracking;
 
@@ -12,11 +13,15 @@ public interface ITrackingStore
     Task SaveAsync(Guid ipoId, Guid instrumentId, CandleBatch batch, CancellationToken token);
 }
 
-public sealed class TrackingRepository(NpgsqlDataSource source) : ITrackingStore
+public sealed class TrackingRepository(NpgsqlDataSource source, IOptions<TrackingOptions> options) : ITrackingStore
 {
-    public async Task<IReadOnlyList<TrackingCandidate>> GetCandidatesAsync(DateOnly today, int recentDays, CancellationToken token)
+    public static string CandidateSql(bool includeWatchlisted)
     {
-        const string sql = """
+        // Omit the relation entirely for ingestion-only roles: a false SQL branch still needs SELECT permission.
+        var savedCandidates = includeWatchlisted
+            ? "OR EXISTS (SELECT 1 FROM \"WatchlistItems\" w WHERE w.\"IpoId\" = i.\"Id\")"
+            : "";
+        return $$"""
             WITH identities AS (
                 SELECT DISTINCT ON (item->>'id') item->>'id' AS slug,
                     NULLIF(item->>'isin', '') AS isin, NULLIF(item->>'symbol', '') AS symbol
@@ -35,10 +40,14 @@ public sealed class TrackingRepository(NpgsqlDataSource source) : ITrackingStore
             WHERE i."SourceName" = 'Upstox' AND i."Status" <> 'Withdrawn'
                 AND (i."ListingDate" AT TIME ZONE 'Asia/Kolkata')::date < @today
                 AND ((i."ListingDate" AT TIME ZONE 'Asia/Kolkata')::date >= @since
-                    OR EXISTS (SELECT 1 FROM "WatchlistItems" w WHERE w."IpoId" = i."Id"))
+                    {{savedCandidates}})
             ORDER BY i."ListingDate" DESC
             """;
-        await using var command = source.CreateCommand(sql);
+    }
+
+    public async Task<IReadOnlyList<TrackingCandidate>> GetCandidatesAsync(DateOnly today, int recentDays, CancellationToken token)
+    {
+        await using var command = source.CreateCommand(CandidateSql(options.Value.IncludeWatchlisted));
         command.Parameters.AddWithValue("today", today);
         command.Parameters.AddWithValue("since", today.AddDays(-recentDays));
         await using var reader = await command.ExecuteReaderAsync(token);
