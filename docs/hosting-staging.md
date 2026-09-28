@@ -8,8 +8,11 @@ Authoritative release runbook: OnlyIPO API repository,
 environment and its two scoped secrets. Manual dispatch on main is allowed
 without the repository opt-in variable; recurring runs require the explicit
 `STAGING_SCHEDULER_ENABLED=true` variable.
-It cannot run automatically merely because this PR merges. Keep opt-in false
-until migrations, least-privilege connection, token and account quota are checked.
+Current state (28 September 2026): opt-in is true and the workflow is active.
+Manual IPO run 36320177270 and tracking run 36419871496 passed before activation.
+The latter updated 128 of 129 candidates, with one unmatched instrument and zero
+failures. A scheduled execution after activation has not yet been verified in
+this record. On a new environment, keep opt-in false until equivalent checks pass.
 
 Only the scheduled workflow may write the staging catalogue. Concurrency protects
 this workflow, not other processes. Use Supabase session pooler port 5432 for
@@ -49,8 +52,8 @@ change was made. Standard ubuntu-latest runners are used, not paid larger runner
 The approved timetable is 09:47 and 18:47 IST daily (04:17 and 13:17 UTC).
 Each scheduled execution refreshes open, upcoming, closed and listed IPOs,
 then prices for listings in the last 90 days. GitHub schedules are best-effort,
-not an exact-time guarantee. The variable remains the kill switch; enable it
-only after the restricted-role tracking manual smoke test passes.
+not an exact-time guarantee. The variable remains the recurring-run kill switch;
+manual dispatch remains available when it is false.
 
 Tracking previously failed because its query referenced WatchlistItems. The
 staging workflow now sets Tracking__IncludeWatchlisted=false and the generated
@@ -63,8 +66,28 @@ Tracking run 36373948986 exceeded the initial 10-minute ceiling without a
 completion summary and is not a successful validation. The follow-up adds
 candidate/progress diagnostics (no secrets or user records) and a 25-minute
 application deadline inside a 30-minute job limit. A busy advisory lock exits
-nonzero instead of treating skipped work as successful. Validate the full run
-before activating recurring tracking.
+nonzero instead of treating skipped work as successful. Replacement run
+36419871496 completed successfully in 12m55s before recurring activation.
+
+## Where it runs and how to operate it
+
+GitHub creates a temporary standard Ubuntu runner for each job, checks out main,
+installs .NET 8, publishes the application, verifies the Supabase CA and executes
+`--run-once` for each IPO status or `--tracking-once` for prices. The runner exits
+when the job ends. There is no always-on scheduler on Netlify or Render and no
+external cron pinger. Actions connects directly to Upstox and the restricted
+Supabase staging role; the frontend reads the stored results through the API.
+
+Open GitHub Actions > Staging data refresh (opt-in) > Run workflow, select main,
+then `ipo` or `tracking` for a manual refresh. Inspect all job conclusions and
+the final summary, not just partial database writes. Use repository Settings >
+Secrets and variables > Actions to set `STAGING_SCHEDULER_ENABLED=false` to stop
+future recurring jobs; that does not cancel a job already running.
+
+Secrets live in the main-only `staging` environment: database connection and
+Upstox token. Rotate expired credentials there, never in source or logs. Runs
+are serialized by the workflow concurrency group; do not point local writers
+at the same staging database. Enable failure notifications on the owner account.
 
 PDF and
 financial ingestion disabled in the free recurring job; those need a bounded
