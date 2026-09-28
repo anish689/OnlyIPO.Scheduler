@@ -21,7 +21,9 @@ public sealed class TrackingSyncService(IMarketDataClient client, ITrackingStore
     public async Task<TrackingSyncResult> SyncAsync(CancellationToken token)
     {
         var today = DateOnly.FromDateTime(DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(5.5)).DateTime);
+        logger.LogInformation("Loading tracking candidates for the last {Days} days.", options.Value.RecentDays);
         var candidates = await store.GetCandidatesAsync(today, options.Value.RecentDays, token);
+        logger.LogInformation("Tracking candidate count: {Count}.", candidates.Count);
         var updated = 0;
         var unmatched = 0;
         var failed = 0;
@@ -29,6 +31,7 @@ public sealed class TrackingSyncService(IMarketDataClient client, ITrackingStore
         {
             try
             {
+                logger.LogInformation("Refreshing tracking for {Slug} ({Completed}/{Total} complete).", ipo.Slug, updated + unmatched + failed, candidates.Count);
                 var master = await client.GetInstrumentsAsync(ipo.Isin ?? ipo.Symbol ?? "", token);
                 var instrument = MarketDataParser.Match(ipo, master);
                 if (instrument is null || (ipo.InstrumentKey is not null && ipo.InstrumentKey != instrument.Key))
@@ -70,6 +73,7 @@ public sealed class TrackingWorker(TrackingSyncService service, IOptions<Trackin
 {
     public async Task<TrackingSyncResult?> RunOnceAsync(CancellationToken token)
     {
+        logger.LogInformation("Opening tracking database session.");
         await using var connection = await source.OpenConnectionAsync(token);
         await using var command = new NpgsqlCommand("SELECT pg_try_advisory_lock(73193301)", connection);
         if (await command.ExecuteScalarAsync(token) is not true) return null;

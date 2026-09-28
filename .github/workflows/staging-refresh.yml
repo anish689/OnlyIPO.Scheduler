@@ -25,7 +25,7 @@ jobs:
     if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || vars.STAGING_SCHEDULER_ENABLED == 'true')
     environment: staging
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: ${{ matrix.status == 'tracking' && 30 || 10 }}
     strategy:
       fail-fast: false
       max-parallel: 1

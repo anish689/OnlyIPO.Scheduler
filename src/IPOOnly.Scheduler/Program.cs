@@ -158,8 +158,17 @@ if (args.Any(arg => arg == "--tracking-once"))
 {
     using var host = builder.Build();
     await host.StartAsync();
-    var result = await host.Services.GetRequiredService<TrackingWorker>().RunOnceAsync(CancellationToken.None);
-    if (result?.Failed > 0) Environment.ExitCode = 1;
+    using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(25));
+    try
+    {
+        var result = await host.Services.GetRequiredService<TrackingWorker>().RunOnceAsync(deadline.Token);
+        if (result is null || result.Failed > 0) Environment.ExitCode = 1;
+    }
+    catch (OperationCanceledException) when (deadline.IsCancellationRequested)
+    {
+        Console.WriteLine("Tracking exceeded its 25-minute deadline. Completed writes are retained; refresh is incomplete.");
+        Environment.ExitCode = 1;
+    }
     await host.StopAsync();
     return;
 }

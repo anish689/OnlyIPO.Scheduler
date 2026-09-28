@@ -40,7 +40,7 @@ the binder appended configured statuses to the prepopulated options array.
 Defaults now live only in appsettings.json, with startup validation and five
 regression cases for scoped and full-catalogue binding. Failed/timed-out runs
 are not release validation, even when they have written some valid records.
-The maximum IPO run budget is 40 runner minutes, plus 10 for tracking.
+The maximum IPO run budget is 40 runner minutes, plus 30 for tracking.
 The repository was verified as already PUBLIC on 28 September 2026; no visibility
 change was made. Standard ubuntu-latest runners are used, not paid larger runners.
 
@@ -58,6 +58,13 @@ query does not reference that table at all. No private user data privileges are
 added. Older watched companies are therefore NOT refreshed in staging; existing
 full-access installations retain their prior behavior by default. A disabled
 SQL predicate alone would not remove PostgreSQL's permission requirement.
+
+Tracking run 36373948986 exceeded the initial 10-minute ceiling without a
+completion summary and is not a successful validation. The follow-up adds
+candidate/progress diagnostics (no secrets or user records) and a 25-minute
+application deadline inside a 30-minute job limit. A busy advisory lock exits
+nonzero instead of treating skipped work as successful. Validate the full run
+before activating recurring tracking.
 
 PDF and
 financial ingestion disabled in the free recurring job; those need a bounded
