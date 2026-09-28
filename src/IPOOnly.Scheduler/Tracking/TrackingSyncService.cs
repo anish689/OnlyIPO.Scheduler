@@ -10,6 +10,7 @@ public sealed class TrackingOptions
     public bool Enabled { get; init; }
     public int RecentDays { get; init; } = 90;
     public int RefreshHours { get; init; } = 24;
+    public bool IncludeWatchlisted { get; init; } = true;
 }
 
 public sealed record TrackingSyncResult(int Eligible, int Updated, int Unmatched, int Failed);

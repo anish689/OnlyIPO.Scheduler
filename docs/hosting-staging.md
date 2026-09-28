@@ -26,7 +26,8 @@ to work around a failure. Render uses a different path, `/etc/secrets/`, so do
 not reuse its connection string for Actions.
 
 This follow-up is part of anish689/OnlyIPO#47. The runtime staging roles and
-15 migrations have been verified; no hosted scheduler run has completed yet.
+15 migrations have been verified. Manual IPO run 36320177270 passed all four
+status partitions on 27 September 2026.
 
 The initial manual run reached its ten-minute limit while successfully fetching
 provider records. Writes are incremental, so that run must not be described as
@@ -39,10 +40,26 @@ the binder appended configured statuses to the prepopulated options array.
 Defaults now live only in appsettings.json, with startup validation and five
 regression cases for scoped and full-catalogue binding. Failed/timed-out runs
 are not release validation, even when they have written some valid records.
-The maximum IPO run budget is now 40 runner minutes, not 10; check the private
-repository's included Actions allowance before enabling recurring runs.
+The maximum IPO run budget is 40 runner minutes, plus 10 for tracking.
+The repository was verified as already PUBLIC on 28 September 2026; no visibility
+change was made. Standard ubuntu-latest runners are used, not paid larger runners.
 
-Two daily IPO refreshes remain opt-in; tracking manual initially. PDF and
+## Recurring refresh and restricted tracking bugfix
+
+The approved timetable is 09:47 and 18:47 IST daily (04:17 and 13:17 UTC).
+Each scheduled execution refreshes open, upcoming, closed and listed IPOs,
+then prices for listings in the last 90 days. GitHub schedules are best-effort,
+not an exact-time guarantee. The variable remains the kill switch; enable it
+only after the restricted-role tracking manual smoke test passes.
+
+Tracking previously failed because its query referenced WatchlistItems. The
+staging workflow now sets Tracking__IncludeWatchlisted=false and the generated
+query does not reference that table at all. No private user data privileges are
+added. Older watched companies are therefore NOT refreshed in staging; existing
+full-access installations retain their prior behavior by default. A disabled
+SQL predicate alone would not remove PostgreSQL's permission requirement.
+
+PDF and
 financial ingestion disabled in the free recurring job; those need a bounded
 manual plan. Monitor failures and stale data. Never copy production users or
-print secrets. Do not make this private repository public for free runner time.
+print secrets. Do not change repository visibility to obtain free runner time.
