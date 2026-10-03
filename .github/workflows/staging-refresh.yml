@@ -6,7 +6,7 @@ on:
       task:
         description: One-shot task (staging only)
         type: choice
-        options: [ipo, tracking]
+        options: [ipo, tracking, financials]
         default: ipo
         required: true
   schedule:
@@ -25,12 +25,12 @@ jobs:
     if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || vars.STAGING_SCHEDULER_ENABLED == 'true')
     environment: staging
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ matrix.status == 'tracking' && 30 || 10 }}
+    timeout-minutes: ${{ matrix.status == 'financials' && 50 || matrix.status == 'tracking' && 30 || 10 }}
     strategy:
       fail-fast: false
       max-parallel: 1
       matrix:
-        status: ${{ fromJSON(inputs.task == 'tracking' && '["tracking"]' || github.event_name == 'schedule' && '["open","upcoming","closed","listed","tracking"]' || '["open","upcoming","closed","listed"]') }}
+        status: ${{ fromJSON(inputs.task == 'financials' && '["financials"]' || inputs.task == 'tracking' && '["tracking"]' || github.event_name == 'schedule' && '["open","upcoming","closed","listed","tracking","financials"]' || '["open","upcoming","closed","listed"]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -55,15 +55,16 @@ jobs:
           ConnectionStrings__IPOOnlyDatabase: ${{ secrets.STAGING_DATABASE_CONNECTION }}
           Upstox__AnalyticsToken: ${{ secrets.STAGING_UPSTOX_TOKEN }}
           DocumentEnrichment__Enabled: 'false'
-          Financials__Enabled: 'false'
+          Financials__Enabled: ${{ matrix.status == 'financials' && 'true' || 'false' }}
+          Financials__SkipFresh: 'true'
           # Staging ingestion role intentionally has no access to user watchlists.
           Tracking__IncludeWatchlisted: 'false'
-          TASK: ${{ matrix.status == 'tracking' && 'tracking' || 'ipo' }}
+          TASK: ${{ matrix.status == 'financials' && 'financials' || matrix.status == 'tracking' && 'tracking' || 'ipo' }}
           # Override every default array slot; the worker deduplicates statuses.
-          Scheduler__Statuses__0: ${{ matrix.status == 'tracking' && 'listed' || matrix.status }}
-          Scheduler__Statuses__1: ${{ matrix.status == 'tracking' && 'listed' || matrix.status }}
-          Scheduler__Statuses__2: ${{ matrix.status == 'tracking' && 'listed' || matrix.status }}
-          Scheduler__Statuses__3: ${{ matrix.status == 'tracking' && 'listed' || matrix.status }}
+          Scheduler__Statuses__0: ${{ (matrix.status == 'tracking' || matrix.status == 'financials') && 'listed' || matrix.status }}
+          Scheduler__Statuses__1: ${{ (matrix.status == 'tracking' || matrix.status == 'financials') && 'listed' || matrix.status }}
+          Scheduler__Statuses__2: ${{ (matrix.status == 'tracking' || matrix.status == 'financials') && 'listed' || matrix.status }}
+          Scheduler__Statuses__3: ${{ (matrix.status == 'tracking' || matrix.status == 'financials') && 'listed' || matrix.status }}
         run: |
           set -euo pipefail
           test -n "$ConnectionStrings__IPOOnlyDatabase" || { echo 'Missing staging database secret'; exit 1; }
@@ -72,5 +73,6 @@ jobs:
           case "$TASK" in
             ipo) dotnet IPOOnly.Scheduler.dll --run-once ;;
             tracking) dotnet IPOOnly.Scheduler.dll --tracking-once ;;
+            financials) dotnet IPOOnly.Scheduler.dll --financials-backfill ;;
             *) echo 'Unsupported task'; exit 1 ;;
           esac

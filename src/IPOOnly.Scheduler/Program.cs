@@ -130,6 +130,10 @@ if (args.Contains("--financials-once") || args.Contains("--financials-preview") 
             if (!builder.Configuration.GetValue<bool>("Financials:Enabled")) throw new InvalidOperationException("Enable Financials after applying migrations.");
             var db = host.Services.GetRequiredService<NpgsqlDataSource>();
             var targets = await IPOOnly.Scheduler.Financials.FinancialBatch.TargetsAsync(db, deadline.Token);
+            if (builder.Configuration.GetValue<bool>("Financials:SkipFresh"))
+                targets = await IPOOnly.Scheduler.Financials.FinancialBatch.DueAsync(targets,
+                    host.Services.GetRequiredService<IPOOnly.Scheduler.Financials.FinancialStore>().IsFreshAsync, deadline.Token);
+            Console.WriteLine($"Financial companies due: {targets.Count}.");
             var result = await IPOOnly.Scheduler.Financials.FinancialBatch.RunAsync(targets,
                 (target, token) => IPOOnly.Scheduler.Financials.FinancialBatch.RefreshAsync(target,
                     host.Services.GetRequiredService<IUpstoxIpoClient>(),
