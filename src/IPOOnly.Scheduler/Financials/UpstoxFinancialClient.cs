@@ -26,7 +26,7 @@ public sealed class UpstoxFinancialClient(HttpClient client, IOptions<UpstoxOpti
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", options.Value.AnalyticsToken);
         using var response = await client.SendAsync(request, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode) throw new FinancialSourceException("Upstox income statement", response.StatusCode);
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
         if (json.Length > 2_000_000) throw new InvalidDataException("Oversized fundamentals response.");
         return Parse(json, url, DateTimeOffset.UtcNow, basis);

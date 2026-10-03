@@ -65,6 +65,30 @@ public sealed class FinancialBatchTests
     }
 
     [Fact]
+    public async Task Restricted_document_is_a_reported_company_failure_not_a_global_auth_failure()
+    {
+        var messages = new List<string>();
+        var result = await FinancialBatch.RunAsync([Target("restricted"), Target("next")],
+            (target, _) => target.Slug == "restricted"
+                ? throw new FinancialSourceException("RHP", HttpStatusCode.Forbidden) : Task.FromResult(12),
+            messages.Add, TimeSpan.Zero, default);
+        Assert.Equal(new FinancialBatchResult(2, 1, 0, 1), result);
+        Assert.Contains(messages, x => x.Contains("RHP HTTP 403"));
+    }
+
+    [Theory]
+    [InlineData("Upstox income statement", HttpStatusCode.Forbidden)]
+    [InlineData("RHP", HttpStatusCode.TooManyRequests)]
+    public async Task Source_auth_and_all_rate_limits_still_stop_the_batch(string source, HttpStatusCode status)
+    {
+        var messages = new List<string>(); var calls = 0;
+        await Assert.ThrowsAsync<FinancialSourceException>(() => FinancialBatch.RunAsync([Target("first"), Target("next")],
+            (_, _) => { calls++; throw new FinancialSourceException(source, status); }, messages.Add, TimeSpan.Zero, default));
+        Assert.Equal(1, calls);
+        Assert.Contains(messages, x => x.Contains($"first: {source} returned {(int)status}"));
+    }
+
+    [Fact]
     public async Task Honors_cancellation_before_contacting_provider()
     {
         using var cancel = new CancellationTokenSource();

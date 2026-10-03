@@ -39,7 +39,7 @@ public sealed class FinancialEnrichmentService(UpstoxFinancialClient upstox, Htt
         deadline.CancelAfter(TimeSpan.FromSeconds(45));
         token = deadline.Token;
         using var response = await documents.GetAsync(rhpUrl, HttpCompletionOption.ResponseHeadersRead, token);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode) throw new FinancialSourceException("RHP", response.StatusCode);
         const int maxBytes = 30 * 1024 * 1024;
         if (response.Content.Headers.ContentLength > maxBytes) throw new InvalidDataException("RHP exceeds size limit.");
         await using var stream = await response.Content.ReadAsStreamAsync(token);
