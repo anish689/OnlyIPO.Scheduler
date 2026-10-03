@@ -9,6 +9,18 @@ public sealed record FinancialBatchResult(int Attempted, int Populated, int Unav
 
 public static class FinancialBatch
 {
+    public static async Task<IReadOnlyList<FinancialTarget>> DueAsync(IReadOnlyList<FinancialTarget> targets,
+        Func<Guid, CancellationToken, Task<bool>> isFresh, CancellationToken token)
+    {
+        var due = new List<FinancialTarget>();
+        foreach (var target in targets)
+        {
+            token.ThrowIfCancellationRequested();
+            if (!await isFresh(target.Id, token)) due.Add(target);
+        }
+        return due;
+    }
+
     public static async Task<IReadOnlyList<FinancialTarget>> TargetsAsync(NpgsqlDataSource db, CancellationToken token, string? slug = null)
     {
         await using var query = db.CreateCommand("""

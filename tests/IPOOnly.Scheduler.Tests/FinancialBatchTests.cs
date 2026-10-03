@@ -8,6 +8,23 @@ public sealed class FinancialBatchTests
     private static FinancialTarget Target(string slug) => new(Guid.NewGuid(), slug, slug);
 
     [Fact]
+    public async Task Scheduled_refresh_skips_fresh_sets_but_keeps_missing_or_stale_companies()
+    {
+        var fresh = Target("fresh"); var stale = Target("stale"); var missing = Target("missing");
+        var due = await FinancialBatch.DueAsync([fresh, stale, missing],
+            (id, _) => Task.FromResult(id == fresh.Id), default);
+        Assert.Equal(new[] { stale, missing }, due);
+    }
+
+    [Fact]
+    public async Task Due_selection_honors_cancellation()
+    {
+        using var cancel = new CancellationTokenSource(); cancel.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => FinancialBatch.DueAsync([Target("first")],
+            (_, _) => throw new InvalidOperationException(), cancel.Token));
+    }
+
+    [Fact]
     public async Task Never_sends_a_market_snapshot_identity_to_the_ipo_endpoint()
     {
         await Assert.ThrowsAsync<InvalidDataException>(() => FinancialBatch.RefreshAsync(

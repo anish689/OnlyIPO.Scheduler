@@ -1,5 +1,18 @@
 # Hosting phase H1: free-only one-shot execution
 
+## Financial-loading bugfix: 3 October 2026
+
+Scheduled IPO/price runs through 3 October passed, but financial ingestion was
+explicitly disabled. The workflow now includes a separate `financials` partition
+and manual task using the existing Upstox-first, validated RHP-fallback pipeline.
+It has a 45-minute application deadline and 50-minute job ceiling. Successful
+sets younger than 24 hours are skipped; empty or failed sources retain existing
+values and remain eligible for retry. Missing coverage is not fabricated.
+110 scheduler tests passed locally; live coverage evidence is recorded after
+the first hosted financial run. No new credentials, privileges or paid service.
+The older PDF/financial-disabled notes below describe the initial H1 release;
+general document-fact enrichment remains disabled, financial RHP fallback does not.
+
 Tracking: https://github.com/anish689/OnlyIPO/issues/47
 Authoritative release runbook: OnlyIPO API repository,
 `docs/hosting-phase-h1-release.md`.
