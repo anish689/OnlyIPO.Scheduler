@@ -1,5 +1,27 @@
 # Hosting phase H1: free-only one-shot execution
 
+## Refresh availability safeguard: 4 October 2026
+
+Financial downloads and PDF parsing run on the separate GitHub Actions worker,
+before a database replacement transaction starts. The API only reads persisted
+data; it does not wait for the whole financial job. A validated company snapshot
+is replaced atomically, so failure retains previous values. The worker processes
+companies sequentially with a small connection pool; no maintenance mode or
+catalogue-wide transaction is used.
+
+Snapshot serialization now uses FOR NO KEY UPDATE, permitting concurrent foreign
+key checks such as watchlist inserts. Transaction-local limits bound lock waits
+to 2 seconds, each SQL statement to 5 seconds, and idle transactions to 10 seconds.
+These settings do not alter API connections or global PostgreSQL configuration.
+114 tests pass, including a real PostgreSQL isolated-schema test for concurrent
+watchlist insertion, reads/activity writes during contention, lock timeout and
+rollback after a failed replacement. CI runs the same test with PostgreSQL 15.
+This reduces application-induced blocking; free-host cold starts, outages and
+shared-database resource limits still prevent a zero-downtime guarantee.
+
+PostgreSQL lock compatibility reference:
+https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-ROWS
+
 ## Financial-loading bugfix: 4 October 2026
 
 Scheduled IPO/price runs through 3 October passed, but financial ingestion was

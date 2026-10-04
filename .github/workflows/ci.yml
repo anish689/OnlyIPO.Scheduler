@@ -9,6 +9,19 @@ on:
 jobs:
   build-test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: local-ci-test
+          POSTGRES_DB: onlyipo_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 10s
+          --health-timeout 5s --health-retries 5
+    env:
+      ONLYIPO_TEST_DATABASE: Host=localhost;Database=onlyipo_test;Username=postgres;Password=local-ci-test
 
     steps:
       - name: Checkout
