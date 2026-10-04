@@ -1,5 +1,15 @@
 # Financial ingestion operator notes
 
+Hosted update, 4 October 2026: financial ingestion is enabled as a separate
+bounded Actions partition (PR #26), with Financials__SkipFresh=true. Successful
+sets less than 24 hours old are skipped. The initial hosted batch populated
+many companies before HTTP 403 stopped it; see the H1 release guide for counts.
+Source-specific diagnostics identify IPO detail, income statement or RHP errors.
+Upstox authentication failures and all HTTP 429 responses stop the batch. A
+restricted RHP is recorded as a failed company while other companies continue;
+no alternative URL, access bypass or guessed data is attempted. Any such company
+failure still gives the completed batch a nonzero exit status.
+
 Issue #15; API issue #41 and frontend issue #43. Phase 21 continuation.
 Full contract and review evidence: [backend guide](https://github.com/anish689/OnlyIPO/blob/codex/financial-highlights/docs/financial-highlights.md).
 

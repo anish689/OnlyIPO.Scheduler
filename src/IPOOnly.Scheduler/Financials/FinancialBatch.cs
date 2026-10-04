@@ -71,10 +71,14 @@ public static class FinancialBatch
                 if (count > 0) populated++; else unavailable++;
                 report($"{target.Slug}: {(count > 0 ? $"populated ({count} observations)" : "no validated coverage; existing values retained")}");
             }
-            catch (HttpRequestException error) when (error.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden or HttpStatusCode.TooManyRequests)
+            catch (HttpRequestException error) when (
+                error.StatusCode == HttpStatusCode.TooManyRequests ||
+                (error is not FinancialSourceException { SourceKind: "RHP" } &&
+                 error.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden))
             {
                 // Stop immediately on authentication/rate limits instead of repeating across the catalogue.
-                report($"Batch stopped: provider returned {(int)error.StatusCode.Value}; completed values retained.");
+                var source = (error as FinancialSourceException)?.SourceKind ?? "Upstox IPO detail";
+                report($"Batch stopped at {target.Slug}: {source} returned {(int)error.StatusCode!.Value}; completed values retained.");
                 throw;
             }
             catch (Exception error) when (error is not OperationCanceledException || !token.IsCancellationRequested)
@@ -88,6 +92,7 @@ public static class FinancialBatch
         return result;
     }
 
-    public static string FailureCode(Exception error) => error is HttpRequestException { StatusCode: { } status }
-        ? $"HTTP {(int)status}" : error.GetType().Name;
+    public static string FailureCode(Exception error) => error is FinancialSourceException source
+        ? $"{source.SourceKind} HTTP {(int)source.StatusCode!.Value}"
+        : error is HttpRequestException { StatusCode: { } status } ? $"HTTP {(int)status}" : error.GetType().Name;
 }

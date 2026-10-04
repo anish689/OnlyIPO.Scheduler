@@ -101,7 +101,9 @@ public sealed class FinancialTests
     {
         var api = new Handler(_ => new(HttpStatusCode.Unauthorized));
         var pdf = new Handler(_ => throw new InvalidOperationException());
-        await Assert.ThrowsAsync<HttpRequestException>(() => Service(api, pdf).FetchAsync("INE002A01018", "https://assets.upstox.com/rhp.pdf", default));
+        var error = await Assert.ThrowsAsync<FinancialSourceException>(() => Service(api, pdf).FetchAsync("INE002A01018", "https://assets.upstox.com/rhp.pdf", default));
+        Assert.Equal("Upstox income statement", error.SourceKind);
+        Assert.Equal(HttpStatusCode.Unauthorized, error.StatusCode);
         Assert.Equal(0, pdf.Calls);
     }
 
