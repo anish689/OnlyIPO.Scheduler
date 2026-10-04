@@ -1,6 +1,6 @@
 # Hosting phase H1: free-only one-shot execution
 
-## Financial-loading bugfix: 3 October 2026
+## Financial-loading bugfix: 4 October 2026
 
 Scheduled IPO/price runs through 3 October passed, but financial ingestion was
 explicitly disabled. The workflow now includes a separate `financials` partition
@@ -8,8 +8,15 @@ and manual task using the existing Upstox-first, validated RHP-fallback pipeline
 It has a 45-minute application deadline and 50-minute job ceiling. Successful
 sets younger than 24 hours are skipped; empty or failed sources retain existing
 values and remain eligible for retry. Missing coverage is not fabricated.
-110 scheduler tests passed locally; live coverage evidence is recorded after
-the first hosted financial run. No new credentials, privileges or paid service.
+PRs #26 and #27 are merged, with 113 tests and CI passing. First backfill
+37144383009 populated 167 companies before a source 403 stopped processing.
+Rerun [37174791115](https://github.com/anish689/OnlyIPO.Scheduler/actions/runs/37174791115)
+passed in 2m25s: 167 fresh sets skipped, 36 attempted, 11 populated, 25 unavailable,
+zero failed. Total coverage is 178 of 203 companies, not universal coverage.
+The earlier 403 did not recur. Source-specific diagnostics now identify failures;
+provider auth errors and any rate limit stop processing, while a denied individual
+RHP records a failed company and continues. Failed batches still exit nonzero.
+No new credentials, privileges or paid service.
 The older PDF/financial-disabled notes below describe the initial H1 release;
 general document-fact enrichment remains disabled, financial RHP fallback does not.
 
@@ -21,11 +28,12 @@ Authoritative release runbook: OnlyIPO API repository,
 environment and its two scoped secrets. Manual dispatch on main is allowed
 without the repository opt-in variable; recurring runs require the explicit
 `STAGING_SCHEDULER_ENABLED=true` variable.
-Current state (28 September 2026): opt-in is true and the workflow is active.
+Current state (4 October 2026): opt-in is true and the workflow is active.
 Manual IPO run 36320177270 and tracking run 36419871496 passed before activation.
 The latter updated 128 of 129 candidates, with one unmatched instrument and zero
-failures. A scheduled execution after activation has not yet been verified in
-this record. On a new environment, keep opt-in false until equivalent checks pass.
+failures. Automatic runs 37140114102 and 37114621361 on 3 October also passed.
+Observed start times can be hours later than nominal cron times. On a new
+environment, keep opt-in false until equivalent checks pass.
 
 Only the scheduled workflow may write the staging catalogue. Concurrency protects
 this workflow, not other processes. Use Supabase session pooler port 5432 for
@@ -56,7 +64,8 @@ the binder appended configured statuses to the prepopulated options array.
 Defaults now live only in appsettings.json, with startup validation and five
 regression cases for scoped and full-catalogue binding. Failed/timed-out runs
 are not release validation, even when they have written some valid records.
-The maximum IPO run budget is 40 runner minutes, plus 30 for tracking.
+The maximum IPO run budget is 40 runner minutes, plus 30 for tracking and 50
+for financials. These are ceilings, not observed runtimes.
 The repository was verified as already PUBLIC on 28 September 2026; no visibility
 change was made. Standard ubuntu-latest runners are used, not paid larger runners.
 
@@ -64,7 +73,7 @@ change was made. Standard ubuntu-latest runners are used, not paid larger runner
 
 The approved timetable is 09:47 and 18:47 IST daily (04:17 and 13:17 UTC).
 Each scheduled execution refreshes open, upcoming, closed and listed IPOs,
-then prices for listings in the last 90 days. GitHub schedules are best-effort,
+then prices for listings in the last 90 days and due financial sets. GitHub schedules are best-effort,
 not an exact-time guarantee. The variable remains the recurring-run kill switch;
 manual dispatch remains available when it is false.
 
