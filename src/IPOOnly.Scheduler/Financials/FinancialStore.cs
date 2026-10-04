@@ -16,8 +16,12 @@ public sealed class FinancialStore(NpgsqlDataSource dataSource)
         if (!FinancialValidation.Usable(rows)) return;
         await using var connection = await dataSource.OpenConnectionAsync(token);
         await using var transaction = await connection.BeginTransactionAsync(token);
+        // Bound contention without changing global database or API settings.
+        await using (var limits = new NpgsqlCommand("SET LOCAL lock_timeout = '2s'; SET LOCAL statement_timeout = '5s'; SET LOCAL idle_in_transaction_session_timeout = '10s'", connection, transaction))
+            await limits.ExecuteNonQueryAsync(token);
         // Serialize concurrent enrichment for the same IPO before replacing its snapshot.
-        await using (var gate = new NpgsqlCommand("SELECT \"Id\" FROM ipos WHERE \"Id\" = @id FOR UPDATE", connection, transaction))
+        // NO KEY UPDATE also permits concurrent foreign-key checks (e.g. tracking an IPO).
+        await using (var gate = new NpgsqlCommand("SELECT \"Id\" FROM ipos WHERE \"Id\" = @id FOR NO KEY UPDATE", connection, transaction))
         {
             gate.Parameters.AddWithValue("id", ipoId);
             if (await gate.ExecuteScalarAsync(token) is null) throw new InvalidDataException("Unknown IPO.");
