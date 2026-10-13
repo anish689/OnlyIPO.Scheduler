@@ -1,0 +1,33 @@
+name: Staging refresh watchdog
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '41 * * * *'
+  workflow_run:
+    workflows: ['Staging data refresh (opt-in)']
+    types: [completed]
+permissions:
+  contents: read
+concurrency:
+  group: staging-refresh-watchdog
+  cancel-in-progress: false
+jobs:
+  check:
+    if: github.ref == 'refs/heads/main' && vars.STAGING_SCHEDULER_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/check-refresh.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
