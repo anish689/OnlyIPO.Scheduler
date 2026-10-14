@@ -192,6 +192,22 @@ public sealed class FinancialTests
     }
 
     [Fact]
+    public async Task Reviewed_replacement_still_obeys_parent_cancellation()
+    {
+        using var stop = new CancellationTokenSource();
+        var bytes = TestPdf();
+        var pdf = new Handler(request =>
+        {
+            if (request.RequestUri!.AbsoluteUri == Broken) return new(HttpStatusCode.Forbidden);
+            stop.Cancel();
+            return new(HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) };
+        });
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => Service(new Handler(_ => throw new Exception()), pdf,
+            Replacement(bytes)).FetchAsync(null, Broken, stop.Token));
+        Assert.Equal(2, pdf.Calls);
+    }
+
+    [Fact]
     public async Task Unsafe_replacement_is_never_requested()
     {
         var pdf = new Handler(_ => new(HttpStatusCode.Forbidden));

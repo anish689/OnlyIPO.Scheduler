@@ -26,8 +26,10 @@ Its SHA-256 is
 An exact-source configuration entry permits this reviewed official copy only
 after the original document returns 403 or 404. No URL guessing, credential
 change, automatic search, or source restriction bypass is performed. The official
-copy uses the existing HTTPS host allowlist, no redirects, 30 MiB bound and shared
-45-second deadline. Its checksum must match before parsing. Citations identify
+copy uses the existing HTTPS host allowlist, no redirects and 30 MiB bound.
+Ordinary documents retain a 45-second deadline; reviewed replacements get a
+bounded three-minute download/parse window after configuration validation.
+Parent cancellation remains effective. Its checksum must match before parsing. Citations identify
 the document actually parsed. Upstox structured financials still take precedence.
 
 401, 429, server errors, unknown document URLs, changed checksums and unsafe
@@ -45,6 +47,13 @@ yielded zero validated observations: this layout is not supported by the current
 conservative parser. The repair resolves document retrieval, not Zetwerk's missing
 financial coverage. That coverage remains unavailable and existing values remain
 unchanged. A hosted financial-only refresh is required before claiming job recovery.
+
+PR #33 passed CI (122 scheduler tests, seven monitoring tests) and was merged.
+Hosted run 38507909261 then attempted 208 targets: 179 populated, 28 unavailable,
+one failed. The official SEBI replacement returned HTTP 200 but its 15.4 MiB body
+exceeded the original 45-second deadline from the GitHub runner. No checksum or
+parse was reached. This evidence motivates the bounded three-minute window for
+reviewed replacements only. API health returned 200 during the refresh (26.8s).
 
 The watchdog intentionally does not let a manual refresh prove scheduled cadence.
 After a successful manual repair test, leave the incident open until a scheduled
