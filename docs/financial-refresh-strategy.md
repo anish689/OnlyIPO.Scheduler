@@ -11,6 +11,25 @@ caching as a separate optimization; do not add another high-frequency full crawl
 No new hosting, billing, database migration or production cutover is part of this
 document. Proposed items below are not implemented by this documentation change.
 
+### Hosted validation result
+
+PR #34 passed CI and was merged before validation run 38597101383 on 14 October.
+That run attempted 29 due issuers: zero populated, 28 unavailable, one failed.
+Zetwerk's original URL still returned 403; the official SEBI transfer then raised
+IOException after roughly 31 seconds. This was not the three-minute deadline.
+Logs report only the exception class, so the underlying connection/read failure
+cannot be narrowed further from this evidence. Existing observations were retained.
+
+Therefore the current fallback is NOT yet proven reliable on hosted runners.
+Keep incident #32 open. Do not keep increasing timeouts or mark the error as empty
+coverage to obtain a green workflow. Next implementation priority: bounded retry
+of transient official-document transport errors within the existing deadline,
+sanitized diagnostic codes, then persistent refresh outcomes and document caching.
+Source access restrictions, checksum failures and parser ambiguity must not be
+treated as transient download errors. Local PDF success is insufficient evidence
+for hosted readiness. Run link:
+https://github.com/anish689/OnlyIPO.Scheduler/actions/runs/38597101383
+
 ## Implemented today
 
 - Scheduled workflow: 09:47 and 18:47 IST, best effort. Financials is a separate
