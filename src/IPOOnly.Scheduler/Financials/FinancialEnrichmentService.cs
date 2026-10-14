@@ -50,6 +50,9 @@ public sealed class FinancialEnrichmentService(UpstoxFinancialClient upstox, Htt
         if (replacement is not null && (!AllowedRhp(replacementUrl) || expectedHash?.Length != 64
             || !expectedHash.All(Uri.IsHexDigit)))
             throw new InvalidDataException("Invalid reviewed RHP replacement configuration.");
+        // Official PDFs can be large and slower from hosted runners. Keep this
+        // longer bounded window exclusive to checksum-reviewed replacements.
+        if (replacement is not null) deadline.CancelAfter(TimeSpan.FromMinutes(3));
         using var alternate = replacement is null ? null
             : await documents.GetAsync(replacementUrl, HttpCompletionOption.ResponseHeadersRead, token);
         var response = alternate ?? primary;
