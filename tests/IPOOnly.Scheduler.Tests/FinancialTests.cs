@@ -1,4 +1,5 @@
 using System.Net;
+using System.Security.Cryptography;
 using IPOOnly.Scheduler.Documents;
 using IPOOnly.Scheduler.Financials;
 using IPOOnly.Scheduler.Upstox;
@@ -127,12 +128,7 @@ public sealed class FinancialTests
     [Fact]
     public async Task Empty_api_falls_back_through_real_pdf_text_extraction()
     {
-        var document = new PdfDocumentBuilder();
-        var font = document.AddStandard14Font(Standard14Font.Helvetica);
-        var page = document.AddPage(PageSize.A4);
-        var y = 750;
-        foreach (var line in Table.Split('\n')) { page.AddText(line, 10, new PdfPoint(30, y), font); y -= 24; }
-        var pdf = new Handler(_ => new(HttpStatusCode.OK) { Content = new ByteArrayContent(document.Build()) });
+        var pdf = new Handler(_ => new(HttpStatusCode.OK) { Content = new ByteArrayContent(TestPdf()) });
         var api = new Handler(request => new(HttpStatusCode.OK) { Content = new StringContent(
             request.RequestUri!.Query.Contains("standalone") ? Empty.Replace("consolidated", "standalone") : Empty) });
         var rows = await Service(api, pdf).FetchAsync("INE002A01018", "https://assets.upstox.com/rhp.pdf", default);
@@ -140,11 +136,84 @@ public sealed class FinancialTests
         Assert.All(rows, x => { Assert.Equal("RHP", x.Source); Assert.Equal(1, x.PageNumber); });
     }
 
+    private static byte[] TestPdf()
+    {
+        var document = new PdfDocumentBuilder();
+        var font = document.AddStandard14Font(Standard14Font.Helvetica);
+        var page = document.AddPage(PageSize.A4);
+        var y = 750;
+        foreach (var line in Table.Split('\n')) { page.AddText(line, 10, new PdfPoint(30, y), font); y -= 24; }
+        return document.Build();
+    }
+
+    private const string Broken = "https://assets.upstox.com/broken.pdf";
+    private const string Official = "https://www.sebi.gov.in/sebi_data/official.pdf";
+    private static IConfiguration Replacement(byte[] bytes, string url = Official, string source = Broken) =>
+        new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Financials:RhpReplacements:0:SourceUrl"] = source,
+            ["Financials:RhpReplacements:0:Url"] = url,
+            ["Financials:RhpReplacements:0:Sha256"] = Convert.ToHexString(SHA256.HashData(bytes))
+        }).Build();
+
+    [Theory]
+    [InlineData(HttpStatusCode.Forbidden)]
+    [InlineData(HttpStatusCode.NotFound)]
+    public async Task Reviewed_replacement_preserves_official_citation(HttpStatusCode status)
+    {
+        var bytes = TestPdf();
+        var pdf = new Handler(request => request.RequestUri!.AbsoluteUri == Broken
+            ? new(status) : new(HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) });
+        var rows = await Service(new Handler(_ => throw new Exception()), pdf, Replacement(bytes)).FetchAsync(null, Broken, default);
+        Assert.Equal(4, rows.Count);
+        Assert.Equal(2, pdf.Calls);
+        Assert.All(rows, x => Assert.Equal(Official, x.SourceUrl));
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.TooManyRequests)]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    public async Task Replacement_does_not_bypass_auth_rate_limits_or_transient_failures(HttpStatusCode status)
+    {
+        var pdf = new Handler(_ => new(status));
+        await Assert.ThrowsAsync<FinancialSourceException>(() => Service(new Handler(_ => throw new Exception()), pdf,
+            Replacement(TestPdf())).FetchAsync(null, Broken, default));
+        Assert.Equal(1, pdf.Calls);
+    }
+
+    [Fact]
+    public async Task Changed_replacement_bytes_fail_closed()
+    {
+        var pdf = new Handler(request => request.RequestUri!.AbsoluteUri == Broken
+            ? new(HttpStatusCode.Forbidden) : new(HttpStatusCode.OK) { Content = new ByteArrayContent(TestPdf()) });
+        await Assert.ThrowsAsync<InvalidDataException>(() => Service(new Handler(_ => throw new Exception()), pdf,
+            Replacement([1, 2, 3])).FetchAsync(null, Broken, default));
+    }
+
+    [Fact]
+    public async Task Unsafe_replacement_is_never_requested()
+    {
+        var pdf = new Handler(_ => new(HttpStatusCode.Forbidden));
+        await Assert.ThrowsAsync<InvalidDataException>(() => Service(new Handler(_ => throw new Exception()), pdf,
+            Replacement(TestPdf(), "http://127.0.0.1/private")).FetchAsync(null, Broken, default));
+        Assert.Equal(1, pdf.Calls);
+    }
+
+    [Fact]
+    public async Task Replacement_is_scoped_to_exact_source_url()
+    {
+        var pdf = new Handler(_ => new(HttpStatusCode.Forbidden));
+        await Assert.ThrowsAsync<FinancialSourceException>(() => Service(new Handler(_ => throw new Exception()), pdf,
+            Replacement(TestPdf(), source: Broken + "?other-issuer")).FetchAsync(null, Broken, default));
+        Assert.Equal(1, pdf.Calls);
+    }
+
     private const string Empty = """{"status":"success","data":{"type":"consolidated","time_period":"yearly","units_in":"crore","income_statement":[]}}""";
     private static IReadOnlyList<FinancialObservation> ParseTable(string text) => new RhpFinancialParser().Parse([new PdfPageText(12, text)], "https://assets.upstox.com/rhp.pdf", At);
-    private static FinancialEnrichmentService Service(Handler api, Handler pdf) => new(
+    private static FinancialEnrichmentService Service(Handler api, Handler pdf, IConfiguration? configuration = null) => new(
         new UpstoxFinancialClient(new HttpClient(api), Options.Create(new UpstoxOptions { AnalyticsToken = "test-only" })),
-        new HttpClient(pdf), new RhpFinancialParser(), new FinancialStore(null!), new ConfigurationBuilder().Build(), NullLogger<FinancialEnrichmentService>.Instance);
+        new HttpClient(pdf), new RhpFinancialParser(), new FinancialStore(null!), configuration ?? new ConfigurationBuilder().Build(), NullLogger<FinancialEnrichmentService>.Instance);
     private sealed class Handler(Func<HttpRequestMessage, HttpResponseMessage> response) : HttpMessageHandler
     {
         public int Calls { get; private set; }

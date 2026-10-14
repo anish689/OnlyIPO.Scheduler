@@ -3,6 +3,8 @@ using IPOOnly.Scheduler.Upstox;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using UglyToad.PdfPig;
+using System.Net;
+using System.Security.Cryptography;
 
 namespace IPOOnly.Scheduler.Financials;
 
@@ -38,8 +40,21 @@ public sealed class FinancialEnrichmentService(UpstoxFinancialClient upstox, Htt
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
         deadline.CancelAfter(TimeSpan.FromSeconds(45));
         token = deadline.Token;
-        using var response = await documents.GetAsync(rhpUrl, HttpCompletionOption.ResponseHeadersRead, token);
+        using var primary = await documents.GetAsync(rhpUrl, HttpCompletionOption.ResponseHeadersRead, token);
+        var replacement = primary.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.NotFound
+            ? configuration.GetSection("Financials:RhpReplacements").GetChildren()
+                .SingleOrDefault(x => string.Equals(x["SourceUrl"], rhpUrl, StringComparison.Ordinal))
+            : null;
+        var replacementUrl = replacement?["Url"];
+        var expectedHash = replacement?["Sha256"];
+        if (replacement is not null && (!AllowedRhp(replacementUrl) || expectedHash?.Length != 64
+            || !expectedHash.All(Uri.IsHexDigit)))
+            throw new InvalidDataException("Invalid reviewed RHP replacement configuration.");
+        using var alternate = replacement is null ? null
+            : await documents.GetAsync(replacementUrl, HttpCompletionOption.ResponseHeadersRead, token);
+        var response = alternate ?? primary;
         if (!response.IsSuccessStatusCode) throw new FinancialSourceException("RHP", response.StatusCode);
+        var sourceUrl = alternate is null ? rhpUrl! : replacementUrl!;
         const int maxBytes = 30 * 1024 * 1024;
         if (response.Content.Headers.ContentLength > maxBytes) throw new InvalidDataException("RHP exceeds size limit.");
         await using var stream = await response.Content.ReadAsStreamAsync(token);
@@ -50,6 +65,13 @@ public sealed class FinancialEnrichmentService(UpstoxFinancialClient upstox, Htt
         {
             if (buffer.Length + count > maxBytes) throw new InvalidDataException("RHP exceeds size limit.");
             buffer.Write(chunk, 0, count);
+        }
+        if (alternate is not null)
+        {
+            var actualHash = Convert.ToHexString(SHA256.HashData(buffer.GetBuffer().AsSpan(0, (int)buffer.Length)));
+            if (!string.Equals(actualHash, expectedHash, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("Reviewed RHP replacement checksum mismatch.");
+            logger.LogInformation("Using checksum-verified official RHP replacement after provider HTTP {Status}.", (int)primary.StatusCode);
         }
         buffer.Position = 0;
         using var pdf = PdfDocument.Open(buffer);
@@ -62,7 +84,7 @@ public sealed class FinancialEnrichmentService(UpstoxFinancialClient upstox, Htt
                 .OrderByDescending(x => x.Key).Select(g => string.Join(" ", g.OrderBy(x => x.BoundingBox.Left).Select(x => x.Text)));
             pages.Add(new(page.Number, string.Join("\n", lines)));
         }
-        return parser.Parse(pages, rhpUrl!, DateTimeOffset.UtcNow);
+        return parser.Parse(pages, sourceUrl, DateTimeOffset.UtcNow);
     }
 
     public static bool AllowedRhp(string? value) => Uri.TryCreate(value, UriKind.Absolute, out var uri)
