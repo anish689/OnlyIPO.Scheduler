@@ -58,17 +58,7 @@ public sealed class FinancialEnrichmentService(UpstoxFinancialClient upstox, Htt
         var response = alternate ?? primary;
         if (!response.IsSuccessStatusCode) throw new FinancialSourceException("RHP", response.StatusCode);
         var sourceUrl = alternate is null ? rhpUrl! : replacementUrl!;
-        const int maxBytes = 30 * 1024 * 1024;
-        if (response.Content.Headers.ContentLength > maxBytes) throw new InvalidDataException("RHP exceeds size limit.");
-        await using var stream = await response.Content.ReadAsStreamAsync(token);
-        using var buffer = new MemoryStream();
-        var chunk = new byte[16384];
-        int count;
-        while ((count = await stream.ReadAsync(chunk, token)) > 0)
-        {
-            if (buffer.Length + count > maxBytes) throw new InvalidDataException("RHP exceeds size limit.");
-            buffer.Write(chunk, 0, count);
-        }
+        using var buffer = await DownloadAsync(response, sourceUrl, token);
         if (alternate is not null)
         {
             var actualHash = Convert.ToHexString(SHA256.HashData(buffer.GetBuffer().AsSpan(0, (int)buffer.Length)));
@@ -88,6 +78,44 @@ public sealed class FinancialEnrichmentService(UpstoxFinancialClient upstox, Htt
             pages.Add(new(page.Number, string.Join("\n", lines)));
         }
         return parser.Parse(pages, sourceUrl, DateTimeOffset.UtcNow);
+    }
+
+    private async Task<MemoryStream> DownloadAsync(HttpResponseMessage initial, string url, CancellationToken token)
+    {
+        const int maxBytes = 30 * 1024 * 1024;
+        for (var attempt = 0; ; attempt++)
+        {
+            using var retry = attempt == 0 ? null
+                : await documents.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, token);
+            var response = retry ?? initial;
+            if (!response.IsSuccessStatusCode) throw new FinancialSourceException("RHP", response.StatusCode);
+            if (response.Content.Headers.ContentLength > maxBytes) throw new InvalidDataException("RHP exceeds size limit.");
+            var buffer = new MemoryStream();
+            try
+            {
+                await using var stream = await response.Content.ReadAsStreamAsync(token);
+                var chunk = new byte[16384];
+                int count;
+                while ((count = await stream.ReadAsync(chunk, token)) > 0)
+                {
+                    if (buffer.Length + count > maxBytes) throw new InvalidDataException("RHP exceeds size limit.");
+                    buffer.Write(chunk, 0, count);
+                }
+                return buffer;
+            }
+            catch (HttpIOException) when (attempt == 0 && !token.IsCancellationRequested)
+            {
+                buffer.Dispose();
+                initial.Dispose();
+                logger.LogWarning("RHP transfer interrupted; retrying once within the existing download deadline.");
+                await Task.Delay(TimeSpan.FromSeconds(2), token);
+            }
+            catch
+            {
+                buffer.Dispose();
+                throw;
+            }
+        }
     }
 
     public static bool AllowedRhp(string? value) => Uri.TryCreate(value, UriKind.Absolute, out var uri)

@@ -29,6 +29,7 @@ for (let page = 1; page <= 10; page++) {
 const incident = issues.find(x => !x.pull_request && x.title === title && x.body?.includes(marker)
   && x.user?.login === 'github-actions[bot]');
 const report = assessment.map(x => `- ${x.partition}: ${x.reason}`).join('\n');
+console.log(`Staging scheduled refresh (due ${assessment[0].due}):\n${report}`);
 if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY,
   `## Staging scheduled refresh\n\n${report}\n\nThis checks execution, not upstream data completeness.\n`);
 if (failures.length) {
