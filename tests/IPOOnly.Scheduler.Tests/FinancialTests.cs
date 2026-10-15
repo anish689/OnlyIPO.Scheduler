@@ -147,6 +147,41 @@ public sealed class FinancialTests
     }
 
     private const string Broken = "https://assets.upstox.com/broken.pdf";
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Interrupted_replacement_download_retries_once_and_discards_partial_bytes(bool alwaysFails)
+    {
+        var bytes = TestPdf();
+        var downloads = 0;
+        var pdf = new Handler(request =>
+        {
+            if (request.RequestUri!.AbsoluteUri == Broken) return new(HttpStatusCode.Forbidden);
+            downloads++;
+            return new(HttpStatusCode.OK) { Content = downloads == 1 || alwaysFails
+                ? new StreamContent(new InterruptedStream()) : new ByteArrayContent(bytes) };
+        });
+        var service = Service(new Handler(_ => throw new Exception()), pdf, Replacement(bytes));
+        if (alwaysFails)
+            await Assert.ThrowsAsync<HttpIOException>(() => service.FetchAsync(null, Broken, default));
+        else
+            Assert.Equal(4, (await service.FetchAsync(null, Broken, default)).Count);
+        Assert.Equal(2, downloads);
+        Assert.Equal(3, pdf.Calls);
+    }
+
+    private sealed class InterruptedStream : MemoryStream
+    {
+        private bool started;
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            if (started) throw new HttpIOException(HttpRequestError.ResponseEnded, "Test truncated response");
+            started = true;
+            buffer.Span[0] = 1;
+            return ValueTask.FromResult(1);
+        }
+    }
+
     private const string Official = "https://www.sebi.gov.in/sebi_data/official.pdf";
     private static IConfiguration Replacement(byte[] bytes, string url = Official, string source = Broken) =>
         new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
