@@ -1,0 +1,69 @@
+name: Production data refresh (manual only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: Production partition to refresh after connection verification
+        type: choice
+        options: [open, upcoming, closed, listed, tracking, financials]
+        default: open
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: youripo-production-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.task == 'financials' && 50 || inputs.task == 'tracking' && 30 || 10 }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Publish one-shot worker
+        run: dotnet publish src/IPOOnly.Scheduler/IPOOnly.Scheduler.csproj -c Release -o out
+      - name: Prepare verified Supabase CA
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
+            --connect-timeout 15 --max-time 60 \
+            https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt \
+            --output /tmp/onlyipo-supabase-ca.crt
+          echo '700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7  /tmp/onlyipo-supabase-ca.crt' | sha256sum --check --status
+          openssl x509 -in /tmp/onlyipo-supabase-ca.crt -noout -checkend 86400
+      - name: Refresh production
+        shell: bash
+        env:
+          DOTNET_ENVIRONMENT: Production
+          DeploymentTarget: production
+          ConnectionStrings__IPOOnlyDatabase: ${{ secrets.PRODUCTION_DATABASE_CONNECTION }}
+          Upstox__AnalyticsToken: ${{ secrets.PRODUCTION_UPSTOX_TOKEN }}
+          DocumentEnrichment__Enabled: 'false'
+          Financials__Enabled: ${{ inputs.task == 'financials' && 'true' || 'false' }}
+          Financials__SkipFresh: 'true'
+          Tracking__IncludeWatchlisted: 'false'
+          TASK: ${{ inputs.task }}
+          Scheduler__Statuses__0: ${{ (inputs.task == 'tracking' || inputs.task == 'financials') && 'listed' || inputs.task }}
+          Scheduler__Statuses__1: ${{ (inputs.task == 'tracking' || inputs.task == 'financials') && 'listed' || inputs.task }}
+          Scheduler__Statuses__2: ${{ (inputs.task == 'tracking' || inputs.task == 'financials') && 'listed' || inputs.task }}
+          Scheduler__Statuses__3: ${{ (inputs.task == 'tracking' || inputs.task == 'financials') && 'listed' || inputs.task }}
+        run: |
+          set -euo pipefail
+          test -n "$ConnectionStrings__IPOOnlyDatabase" || { echo 'Missing production database secret'; exit 1; }
+          test -n "$Upstox__AnalyticsToken" || { echo 'Missing production provider secret'; exit 1; }
+          cd out
+          case "$TASK" in
+            open|upcoming|closed|listed) dotnet IPOOnly.Scheduler.dll --run-once ;;
+            tracking) dotnet IPOOnly.Scheduler.dll --tracking-once ;;
+            financials) dotnet IPOOnly.Scheduler.dll --financials-backfill ;;
+            *) echo 'Unsupported task'; exit 1 ;;
+          esac

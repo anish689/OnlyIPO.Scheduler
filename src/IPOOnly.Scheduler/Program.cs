@@ -12,6 +12,9 @@ using IPOOnly.Scheduler.Tracking;
 
 var builder = Host.CreateApplicationBuilder(args.Where(x => x is not ("--financials-once" or "--financials-preview" or "--financials-backfill")).ToArray());
 
+if (builder.Configuration["DeploymentTarget"] == "production")
+    ProductionConnectionGuard.Validate(builder.Configuration.GetConnectionString("IPOOnlyDatabase"));
+
 // RSS and review remain independent; only the Upstox news adapter requires its token.
 if (args.Any(x => new[] { "--news-once", "--news-worker", "--news-review", "--news-publish", "--news-withdraw", "--news-upstox-check" }.Contains(x)))
 {
