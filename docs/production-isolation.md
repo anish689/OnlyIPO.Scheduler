@@ -1,10 +1,14 @@
 # Production scheduler isolation
 
-Updated: 18 October 2026. Production scheduling is not provisioned or enabled.
+Updated: 15 November 2026. Five production ingestion partitions passed;
+financials populated 152 companies but reported one RHP HTTP 403 failure.
+Automatic production schedules and public release remain off.
 
 The canonical inventory is in the API repository's
-[current status](https://github.com/anish689/OnlyIPO/blob/codex/production-isolation/docs/current-status.md)
-and [production runbook](https://github.com/anish689/OnlyIPO/blob/codex/production-isolation/docs/production-isolation.md).
+[current status](https://github.com/anish689/OnlyIPO/blob/main/docs/current-status.md)
+and [production runbook](https://github.com/anish689/OnlyIPO/blob/main/docs/production-isolation.md).
+The [14 November acceptance record](production-ingestion-2026-11-14.md) supersedes
+older statements that production scheduler secrets are missing.
 Historical incident documents retain their original observations.
 
 ## Current staging operation
@@ -34,13 +38,16 @@ disabled until the new production schema and permissions are verified.
 Before adding an enabled production schedule, run each partition manually against
 the new database and verify row freshness and non-destructive fallback. Adapt
 the watchdog to a distinct workflow, environment and incident title so staging
-success cannot conceal a production failure. A manual-only production refresh
-workflow is prepared on the production-isolation branch, but not deployed or run.
+success cannot conceal a production failure. The manual-only production refresh
+workflow is deployed on main and has been exercised against production.
 It supports each of the six partitions, isolated concurrency, production-only
 secret names, verified TLS, and a startup guard rejecting incorrect database
 identities and pools exceeding three connections. On 18 October the approved
 production environment was created and verified to allow only branch main, not
-tags. Secret setup remains pending. There is no production watchdog yet.
+tags. On 14 November both production secret names were verified after private
+owner setup. The existing Upstox token was reused with explicit owner approval;
+the database login and database remain production-specific. Successful ingestion
+verified scheduler authentication and TLS. There is no production watchdog yet.
 Check Actions allowances before enabling
 additional runs; no paid capacity is authorized.
 
