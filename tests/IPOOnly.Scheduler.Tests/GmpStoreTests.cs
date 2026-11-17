@@ -9,11 +9,12 @@ public sealed class GmpStoreTests
     public async Task Refresh_is_atomic_idempotent_and_isolated_from_application_reads()
     {
         var schema = "gmp_test_" + Guid.NewGuid().ToString("N");
-        await using var admin = NpgsqlDataSource.Create(Environment.GetEnvironmentVariable("ONLYIPO_TEST_DATABASE")!);
+        var connectionString = Environment.GetEnvironmentVariable("ONLYIPO_TEST_DATABASE")!;
+        await using var admin = NpgsqlDataSource.Create(connectionString);
         await using (var create = admin.CreateCommand($"CREATE SCHEMA {schema}")) await create.ExecuteNonQueryAsync();
         try
         {
-            var options = new NpgsqlConnectionStringBuilder(admin.ConnectionString) { SearchPath = schema, CommandTimeout = 5 };
+            var options = new NpgsqlConnectionStringBuilder(connectionString) { SearchPath = schema, CommandTimeout = 5 };
             await using var db = NpgsqlDataSource.Create(options.ConnectionString);
             await using (var setup = db.CreateCommand("""
                 CREATE TABLE ipos ("Id" uuid PRIMARY KEY, "Slug" text UNIQUE, "Status" text,
