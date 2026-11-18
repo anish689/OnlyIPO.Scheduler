@@ -25,7 +25,8 @@ jobs:
     if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || vars.STAGING_SCHEDULER_ENABLED == 'true')
     environment: staging
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ matrix.status == 'financials' && 50 || matrix.status == 'tracking' && 30 || 10 }}
+    # The full listed catalogue is larger than the active IPO partitions.
+    timeout-minutes: ${{ matrix.status == 'financials' && 50 || matrix.status == 'tracking' && 30 || matrix.status == 'listed' && 20 || 10 }}
     strategy:
       fail-fast: false
       max-parallel: 1

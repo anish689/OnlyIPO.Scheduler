@@ -38,8 +38,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Monitoring policy tests
-        run: node --test scripts/refresh-health.test.mjs
+      - name: Monitoring and workflow policy tests
+        run: node --test scripts/refresh-health.test.mjs scripts/workflow-contract.test.mjs
 
       - name: Build
         run: dotnet build IPOOnly.Scheduler.sln --configuration Release --no-restore

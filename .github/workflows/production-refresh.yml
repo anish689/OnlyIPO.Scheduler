@@ -22,7 +22,8 @@ jobs:
     if: github.ref == 'refs/heads/main'
     environment: production
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ inputs.task == 'financials' && 50 || inputs.task == 'tracking' && 30 || 10 }}
+    # The full listed catalogue is larger than the active IPO partitions.
+    timeout-minutes: ${{ inputs.task == 'financials' && 50 || inputs.task == 'tracking' && 30 || inputs.task == 'listed' && 20 || 10 }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
