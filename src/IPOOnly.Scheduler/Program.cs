@@ -10,7 +10,23 @@ using Microsoft.Extensions.Options;
 using Npgsql;
 using IPOOnly.Scheduler.Tracking;
 
-var builder = Host.CreateApplicationBuilder(args.Where(x => x is not ("--financials-once" or "--financials-preview" or "--financials-backfill")).ToArray());
+var builder = Host.CreateApplicationBuilder(args.Where(x => x is not ("--financials-once" or "--financials-preview" or "--financials-backfill" or "--gmp-preview" or "--gmp-once")).ToArray());
+
+if (args.Contains("--gmp-preview") || args.Contains("--gmp-once"))
+{
+    using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+    try
+    {
+        Environment.ExitCode = await IPOOnly.Scheduler.Gmp.GmpCommand.RunAsync(builder.Configuration, args.Contains("--gmp-preview"), deadline.Token);
+    }
+    catch (Exception error) when (error is HttpRequestException or InvalidDataException or System.Text.Json.JsonException
+        or OperationCanceledException or InvalidOperationException or NpgsqlException)
+    {
+        Console.WriteLine($"GMP refresh failed ({error.GetType().Name}); no partial batch published. Existing observations keep their original expiry.");
+        Environment.ExitCode = 1;
+    }
+    return;
+}
 
 if (builder.Configuration["DeploymentTarget"] == "production")
     ProductionConnectionGuard.Validate(builder.Configuration.GetConnectionString("IPOOnlyDatabase"));
