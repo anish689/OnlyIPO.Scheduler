@@ -1,7 +1,8 @@
-import { assessRefresh } from './refresh-health.mjs';
+import { assessRefresh, refreshPolicy } from './refresh-health.mjs';
 import { appendFileSync } from 'node:fs';
 
 const repo = process.env.GITHUB_REPOSITORY;
+const policy = refreshPolicy(process.env.REFRESH_ENVIRONMENT);
 if (!repo || !process.env.GH_TOKEN) throw new Error('GitHub repository and token are required.');
 async function api(path, method = 'GET', body) {
   const response = await fetch(`https://api.github.com/repos/${repo}/${path}`, {
@@ -12,13 +13,13 @@ async function api(path, method = 'GET', body) {
   if (!response.ok) throw new Error(`GitHub request failed: HTTP ${response.status}`);
   return response.json();
 }
-const { workflow_runs: runs } = await api('actions/workflows/staging-refresh.yml/runs?branch=main&event=schedule&per_page=30');
+const { workflow_runs: runs } = await api(`actions/workflows/${policy.workflow}/runs?branch=main&event=schedule&per_page=30`);
 const jobs = {};
 for (const run of runs.slice(0, 6)) jobs[run.id] = (await api(`actions/runs/${run.id}/jobs?per_page=100`)).jobs;
-const assessment = assessRefresh(runs.slice(0, 6), jobs);
+const assessment = assessRefresh(runs.slice(0, 6), jobs, new Date(), policy);
 const failures = assessment.filter(x => !x.healthy);
-const title = '[operations] Staging refresh needs attention';
-const marker = '<!-- youripo-staging-refresh-watchdog -->';
+const title = `[operations] ${policy.label} refresh needs attention`;
+const marker = policy.marker;
 const issues = [];
 for (let page = 1; page <= 10; page++) {
   const batch = await api(`issues?state=open&per_page=100&page=${page}`);
@@ -29,9 +30,9 @@ for (let page = 1; page <= 10; page++) {
 const incident = issues.find(x => !x.pull_request && x.title === title && x.body?.includes(marker)
   && x.user?.login === 'github-actions[bot]');
 const report = assessment.map(x => `- ${x.partition}: ${x.reason}`).join('\n');
-console.log(`Staging scheduled refresh (due ${assessment[0].due}):\n${report}`);
+console.log(`${policy.label} scheduled refresh (due ${assessment[0].due}):\n${report}`);
 if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY,
-  `## Staging scheduled refresh\n\n${report}\n\nThis checks execution, not upstream data completeness.\n`);
+  `## ${policy.label} scheduled refresh\n\n${report}\n\nThis checks execution, not upstream data completeness.\n`);
 if (failures.length) {
   const body = `${marker}\nScheduled refresh requires investigation. Latest due cycle: ${assessment[0].due}.\n\n${report}\n\n${runs[0]?.html_url ?? 'No scheduled runs found.'}\n\nExisting data must be retained. Inspect source failures; do not bypass authentication, rate limits or document access restrictions.\n\nSubscribe to this issue/repository for GitHub notifications. No email delivery guarantee is implied.`;
   if (!incident) await api('issues', 'POST', { title, body });

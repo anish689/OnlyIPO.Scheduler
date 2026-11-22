@@ -1,4 +1,4 @@
-name: Production data refresh (manual only)
+name: Production data refresh (opt-in)
 
 on:
   workflow_dispatch:
@@ -6,9 +6,12 @@ on:
       task:
         description: Production partition to refresh after connection verification
         type: choice
-        options: [open, upcoming, closed, listed, tracking, financials]
+        options: [all, open, upcoming, closed, listed, tracking, financials]
         default: open
         required: true
+  schedule:
+    # UTC: 12:37 and 21:37 India time; separated from staging's bounded cycles.
+    - cron: '7 7,16 * * *'
 
 permissions:
   contents: read
@@ -19,11 +22,16 @@ concurrency:
 
 jobs:
   refresh:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || vars.PRODUCTION_SCHEDULER_ENABLED == 'true')
     environment: production
     runs-on: ubuntu-latest
     # The full listed catalogue is larger than the active IPO partitions.
-    timeout-minutes: ${{ inputs.task == 'financials' && 50 || inputs.task == 'tracking' && 30 || inputs.task == 'listed' && 20 || 10 }}
+    timeout-minutes: ${{ matrix.status == 'financials' && 50 || matrix.status == 'tracking' && 30 || matrix.status == 'listed' && 20 || 10 }}
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        status: ${{ fromJSON(github.event_name == 'schedule' && '["open","upcoming","closed","listed","tracking","financials"]' || inputs.task == 'all' && '["open","upcoming","closed","listed","tracking","financials"]' || format('["{0}"]', inputs.task)) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -49,14 +57,14 @@ jobs:
           ConnectionStrings__IPOOnlyDatabase: ${{ secrets.PRODUCTION_DATABASE_CONNECTION }}
           Upstox__AnalyticsToken: ${{ secrets.PRODUCTION_UPSTOX_TOKEN }}
           DocumentEnrichment__Enabled: 'false'
-          Financials__Enabled: ${{ inputs.task == 'financials' && 'true' || 'false' }}
+          Financials__Enabled: ${{ matrix.status == 'financials' && 'true' || 'false' }}
           Financials__SkipFresh: 'true'
           Tracking__IncludeWatchlisted: 'false'
-          TASK: ${{ inputs.task }}
-          Scheduler__Statuses__0: ${{ (inputs.task == 'tracking' || inputs.task == 'financials') && 'listed' || inputs.task }}
-          Scheduler__Statuses__1: ${{ (inputs.task == 'tracking' || inputs.task == 'financials') && 'listed' || inputs.task }}
-          Scheduler__Statuses__2: ${{ (inputs.task == 'tracking' || inputs.task == 'financials') && 'listed' || inputs.task }}
-          Scheduler__Statuses__3: ${{ (inputs.task == 'tracking' || inputs.task == 'financials') && 'listed' || inputs.task }}
+          TASK: ${{ matrix.status }}
+          Scheduler__Statuses__0: ${{ (matrix.status == 'tracking' || matrix.status == 'financials') && 'listed' || matrix.status }}
+          Scheduler__Statuses__1: ${{ (matrix.status == 'tracking' || matrix.status == 'financials') && 'listed' || matrix.status }}
+          Scheduler__Statuses__2: ${{ (matrix.status == 'tracking' || matrix.status == 'financials') && 'listed' || matrix.status }}
+          Scheduler__Statuses__3: ${{ (matrix.status == 'tracking' || matrix.status == 'financials') && 'listed' || matrix.status }}
         run: |
           set -euo pipefail
           test -n "$ConnectionStrings__IPOOnlyDatabase" || { echo 'Missing production database secret'; exit 1; }
