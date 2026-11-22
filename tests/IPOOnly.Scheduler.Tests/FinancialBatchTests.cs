@@ -64,16 +64,43 @@ public sealed class FinancialBatchTests
         Assert.Equal(1, calls);
     }
 
-    [Fact]
-    public async Task Restricted_document_is_a_reported_company_failure_not_a_global_auth_failure()
+    [Theory]
+    [InlineData(HttpStatusCode.Forbidden)]
+    [InlineData(HttpStatusCode.NotFound)]
+    [InlineData(HttpStatusCode.Gone)]
+    public async Task Unavailable_document_is_nonblocking_coverage_with_sanitized_evidence(HttpStatusCode status)
     {
         var messages = new List<string>();
         var result = await FinancialBatch.RunAsync([Target("restricted"), Target("next")],
             (target, _) => target.Slug == "restricted"
-                ? throw new FinancialSourceException("RHP", HttpStatusCode.Forbidden) : Task.FromResult(12),
+                ? throw new FinancialSourceException("RHP", status) : Task.FromResult(12),
             messages.Add, TimeSpan.Zero, default);
-        Assert.Equal(new FinancialBatchResult(2, 1, 0, 1), result);
-        Assert.Contains(messages, x => x.Contains("RHP HTTP 403"));
+        Assert.Equal(new FinancialBatchResult(2, 1, 1, 0), result);
+        Assert.Contains(messages, x => x.Contains($"no validated coverage (RHP HTTP {(int)status}); existing values retained"));
+    }
+
+    [Theory]
+    [InlineData("RHP", HttpStatusCode.ServiceUnavailable)]
+    [InlineData("RHP", HttpStatusCode.Unauthorized)]
+    [InlineData("Upstox income statement", HttpStatusCode.NotFound)]
+    public async Task Other_source_failures_are_not_downgraded_to_coverage(string source, HttpStatusCode status)
+    {
+        var result = await FinancialBatch.RunAsync([Target("first")],
+            (_, _) => throw new FinancialSourceException(source, status), _ => { }, TimeSpan.Zero, default);
+        Assert.Equal(new FinancialBatchResult(1, 0, 0, 1), result);
+    }
+
+    [Fact]
+    public async Task Database_and_identity_failures_remain_failed()
+    {
+        foreach (var error in new Exception[] { new Npgsql.NpgsqlException("private database detail"), new InvalidDataException("identity") })
+        {
+            var messages = new List<string>();
+            var result = await FinancialBatch.RunAsync([Target("first")], (_, _) => throw error,
+                messages.Add, TimeSpan.Zero, default);
+            Assert.Equal(1, result.Failed);
+            Assert.DoesNotContain(messages, x => x.Contains(error.Message));
+        }
     }
 
     [Theory]

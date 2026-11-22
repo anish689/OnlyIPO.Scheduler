@@ -71,6 +71,13 @@ public static class FinancialBatch
                 if (count > 0) populated++; else unavailable++;
                 report($"{target.Slug}: {(count > 0 ? $"populated ({count} observations)" : "no validated coverage; existing values retained")}");
             }
+            catch (FinancialSourceException error) when (error.SourceKind == "RHP" &&
+                error.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.NotFound or HttpStatusCode.Gone)
+            {
+                // An inaccessible issuer document is a coverage gap, not a failed data refresh.
+                unavailable++;
+                report($"{target.Slug}: no validated coverage ({FailureCode(error)}); existing values retained");
+            }
             catch (HttpRequestException error) when (
                 error.StatusCode == HttpStatusCode.TooManyRequests ||
                 (error is not FinancialSourceException { SourceKind: "RHP" } &&

@@ -59,3 +59,11 @@ inactivity; see [GitHub schedule behavior](https://docs.github.com/en/actions/re
 A watchdog on the same platform cannot detect a total GitHub scheduling outage.
 No reliability SLA or continuous uptime is claimed. The owner-paused Codex
 availability monitor remains unrelated and paused.
+
+## Issuer document coverage classification
+
+Acceptance run 44991226480 populated 155 of 180 financial targets, with 24
+unavailable and one RHP HTTP 403. Issue #51 classifies only document-scoped
+403/404/410 as unavailable coverage, retaining stored data and sanitized
+per-company logs. It does not suppress provider auth/rate limits, RHP 5xx,
+database errors or identity failures. Unavailable coverage is not fresh data.
