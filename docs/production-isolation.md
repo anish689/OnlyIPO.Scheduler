@@ -1,5 +1,9 @@
 # Production scheduler isolation
 
+22 November preparation: [issue #49 rollout](production-refresh-readiness.md)
+adds a default-off production schedule and separate watchdog. The historical
+manual-only acceptance below is not evidence that the new schedule is active.
+
 Updated: 15 November 2026. Five production ingestion partitions passed;
 financials populated 152 companies but reported one RHP HTTP 403 failure.
 Automatic production schedules and public release remain off.
