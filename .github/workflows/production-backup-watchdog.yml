@@ -1,0 +1,33 @@
+name: Production backup watchdog
+
+on:
+  schedule:
+    - cron: '13 22 * * *'
+  workflow_dispatch:
+  workflow_run:
+    workflows: [Production encrypted database backup]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+concurrency:
+  group: youripo-production-backup-watchdog
+  cancel-in-progress: false
+
+jobs:
+  check:
+    if: github.ref == 'refs/heads/main' && vars.PRODUCTION_BACKUP_SCHEDULE_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Check verified backup and maintain one incident
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/backup/check-health.mjs
