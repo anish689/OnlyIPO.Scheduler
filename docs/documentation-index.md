@@ -6,6 +6,7 @@ Start with [README](../README.md), [SDLC workflow](development-workflow.md), [do
 
 | Document | Classification |
 | --- | --- |
+| [Scheduler runtime upgrade](runtime-upgrade-2026-11-27.md) | Maintained rollout / acceptance record |
 | [pull_request_template](../.github/pull_request_template.md) | Maintained |
 | [Contributing to YourIPO](../CONTRIBUTING.md) | Maintained |
 | [YourIPO scheduler and production backups](../README.md) | Maintained |

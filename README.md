@@ -6,7 +6,7 @@ Companion repositories: [API/schema](https://github.com/anish689/OnlyIPO) and [f
 
 ## Runtime and local use
 
-The worker currently targets `net8.0`, with SDK 8.0.424 in [global.json](global.json). This is an observed dependency, **not a supported release recommendation**: .NET 8 support ended 10 November 2026. [Coordinated upgrade issue #109](https://github.com/anish689/OnlyIPO/issues/109) remains open.
+The worker targets `net10.0` on .NET 10 LTS, with SDK 10.0.404 pinned in [global.json](global.json). Microsoft runtime libraries use 10.0.15 and Npgsql uses 10.0.4. CI and both refresh workflows consume the same SDK file. See the [runtime upgrade record](docs/runtime-upgrade-2026-11-27.md); source capability is distinct from the hosted acceptance tracked by [API issue #109](https://github.com/anish689/OnlyIPO/issues/109).
 
 ```sh
 dotnet restore IPOOnly.Scheduler.sln
