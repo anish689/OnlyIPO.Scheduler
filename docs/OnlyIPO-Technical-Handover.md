@@ -1,5 +1,9 @@
 # OnlyIPO Technical Handover
 
+<!-- historical-status -->
+> **Historical record / plan.** Preserved for its original revision and dates; this is not current deployment instruction or proof of present readiness. Use the [documentation index](documentation-index.md) and current release status. Do not execute old mutations or resume stopped jobs from this record.
+
+
 Last updated: 1 September 2026
 
 This document explains the current OnlyIPO application stack, local setup, repositories, URLs, key files, data flow, development workflow, and operating steps. It is written so the project can be run and maintained without relying on AI support.

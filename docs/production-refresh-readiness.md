@@ -1,8 +1,12 @@
 # Production freshness operation
 
-Prepared 22 November 2026 for issue #49. Activation and hosted acceptance are
-separate from merging this change. Do not infer successful execution from a
-configured cron or a green local test.
+Maintained operation; reviewed 27 November 2026. Owner: scheduler maintainer.
+Issue #49 introduced the schedule. Scheduled six-partition completion and
+watchdog recovery were subsequently observed; the owner confirmed receipt of
+the recovery email for [incident #53](https://github.com/anish689/OnlyIPO.Scheduler/issues/53).
+The rollout steps below describe the activation procedure, not outstanding work.
+Do not infer source completeness or future successful execution from a configured
+cron, a green local test or that dated acceptance.
 
 ## Isolation and cost
 

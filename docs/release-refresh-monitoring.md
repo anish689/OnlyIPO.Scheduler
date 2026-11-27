@@ -1,5 +1,9 @@
 # Release refresh monitoring
 
+<!-- historical-status -->
+> **Historical record / plan.** Preserved for its original revision and dates; this is not current deployment instruction or proof of present readiness. Use the [documentation index](documentation-index.md) and current release status. Do not execute old mutations or resume stopped jobs from this record.
+
+
 13 October 2026. Staging only; no production secrets or costs introduced.
 
 The watchdog inspects all six scheduled partitions independently after refresh

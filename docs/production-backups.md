@@ -1,5 +1,8 @@
 # Production application backups
 
+Maintained reference; reviewed 27 November 2026. Owner: repository maintainer.
+Current release state: [shared status index](https://github.com/anish689/OnlyIPO/blob/main/docs/current-status.md).
+
 Implements issue #63. Rollout is gated: merging these files does not activate
 backups. Use only standard GitHub-hosted runners in this public repository and
 existing personal Google Drive storage; no paid plan, larger runner, Google Cloud

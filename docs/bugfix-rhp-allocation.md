@@ -1,5 +1,9 @@
 # RHP Allocation Correctness Bug Fix
 
+<!-- historical-status -->
+> **Historical record / plan.** Preserved for its original revision and dates; this is not current deployment instruction or proof of present readiness. Use the [documentation index](documentation-index.md) and current release status. Do not execute old mutations or resume stopped jobs from this record.
+
+
 Issue: https://github.com/anish689/OnlyIPO.Scheduler/issues/11
 Related frontend: https://github.com/anish689/only-ipo-web/pull/38
 Date: 13 September 2026. Bug fix, not a new phase.
