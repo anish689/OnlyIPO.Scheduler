@@ -27,8 +27,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq age postgresql-17 postgresql-client-17
+          bash scripts/backup/install-tools.sh
           curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
             --connect-timeout 15 --max-time 60 \
             https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt \

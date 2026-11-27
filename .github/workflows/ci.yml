@@ -17,9 +17,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install rehearsal tools
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq age postgresql-17 postgresql-client-17
+        run: bash scripts/backup/install-tools.sh
       - name: Fictional backup, restore, encryption and failure-path tests
         env:
           BACKUP_TEST_PG_BIN: /usr/lib/postgresql/17/bin
