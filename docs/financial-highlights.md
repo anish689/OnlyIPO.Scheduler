@@ -1,68 +1,19 @@
 # Financial ingestion operator notes
 
-Hosted update, 4 October 2026: financial ingestion is enabled as a separate
-bounded Actions partition (PR #26), with Financials__SkipFresh=true. Successful
-sets less than 24 hours old are skipped. The initial hosted batch populated
-many companies before HTTP 403 stopped it; see the H1 release guide for counts.
-Source-specific diagnostics identify IPO detail, income statement or RHP errors.
-Upstox authentication failures and all HTTP 429 responses stop the batch. A
-restricted RHP is recorded as a failed company while other companies continue;
-no alternative URL, access bypass or guessed data is attempted. Any such company
-failure still gives the completed batch a nonzero exit status.
+Maintained guide; reviewed 27 November 2026. Owner: scheduler maintainer. [Financial source strategy](financial-refresh-strategy.md) retains design/incident evidence; [operations](operations-guide.md) describes current failure classification.
 
-Issue #15; API issue #41 and frontend issue #43. Phase 21 continuation.
-Full contract and review evidence: [backend guide](https://github.com/anish689/OnlyIPO/blob/codex/financial-highlights/docs/financial-highlights.md).
+The hosted financials partition runs separately from catalogue/tracking with `Financials__Enabled=true` and `Financials__SkipFresh=true`; other hosted partitions disable financial enrichment. Successful sets younger than 24 hours can be skipped. Upstox consolidated annual statements take priority, followed by standalone; insufficient valid coverage may use a conservative RHP parser. Request/schema/identity errors never justify fabricated replacement data.
 
-Upstox consolidated annual income statements take priority, then standalone. Only
-insufficient coverage falls back to the conservative RHP parser. Request/schema
-failures retain last-known-good data. An HTTP 200 with no history is not usable data.
-Apply API migration `20260914132659_AddIpoFinancials` before enabling this feature.
-
-Development mode loads existing `ipoonly-scheduler-local` user-secrets. No token goes
-in appsettings or git. `Financials:Enabled` defaults false. Preview reads sources and
-the existing IPO identity, but writes nothing:
+Preview one existing local IPO without writing:
 
 ```sh
-DOTNET_ENVIRONMENT=Development Financials__Slug=qualiance-international-limited-ipo dotnet run --project src/IPOOnly.Scheduler -- --financials-preview
+DOTNET_ENVIRONMENT=Development Financials__Slug='existing-local-slug' dotnet run --project src/IPOOnly.Scheduler -- --financials-preview
 ```
 
-Persist one company's validated set:
+Replace the placeholder before running; preview still calls the provider. To persist use `Financials__Enabled=true` with `--financials-once`; `--financials-backfill` processes the eligible catalogue sequentially. Verify the local database and provider-call budget first. Hosted manual reruns use the selected workflow task instead of a duplicate long-running process.
 
-```sh
-DOTNET_ENVIRONMENT=Development Financials__Enabled=true Financials__Slug=qualiance-international-limited-ipo dotnet run --project src/IPOOnly.Scheduler -- --financials-once
-```
+Single-company operations have a three-minute deadline; the batch has a 45-minute deadline within the hosted 50-minute job budget. API/provider auth failures and HTTP429 stop the batch. **RHP-specific 403/404/410 count as unavailable coverage**, retain stored data and allow other companies to proceed. RHP5xx, other transfer/schema/database failures remain failures. This supersedes older notes that every issuer RHP403 necessarily fails the batch.
 
-Replace the slug with an existing Upstox-sourced IPO. Commands have a three-minute
-deadline and nonzero failure exit code. Regular IPO sync also supports the feature
-when explicitly enabled, skipping successful sets younger than 24 hours. Empty
-coverage has no negative cache yet; consider provider traffic before enabling it.
-The initial two-company review has been superseded by a catalogue-wide backfill.
+The parser requires supported annual statement layout, basis, units and dates, keeps page/source citations, and withholds ambiguous/scanned/conflicting values. No DRHP financial publication or guessed zeros. General RHP document-fact enrichment is a separate feature and remains disabled in hosted schedules. Reviewed official replacement URLs require their configured checksum and source identity.
 
-```sh
-DOTNET_ENVIRONMENT=Development Financials__Enabled=true dotnet run --project src/IPOOnly.Scheduler -- --financials-backfill
-```
-
-This command has a 45-minute deadline and runs sequentially with 750 ms between
-companies. It reports every attempted company, retains successful writes if a later
-company fails, and exits nonzero when failures occur. HTTP 401/403/429 stop the batch.
-Missing coverage is reported separately from request failures. This is an explicit
-backfill command, not a new OS schedule; normal refresh still requires the feature flag.
-
-Both single-company and batch selection now accept only IPO list/detail snapshots.
-Tracking snapshots share SourceName=Upstox but use market:<instrument-id>; selecting
-the latest snapshot without checking its endpoint caused HTTP 400 for many companies.
-The corrected run attempted 174 companies: 140 populated, 33 unavailable, one invalid
-PDF response. Raksan and ESDS now contain four annual periods. The batch therefore
-returned nonzero, correctly: complete coverage is NOT claimed. See the backend
-`docs/financial-coverage-review.md` for outstanding RHP/DRHP limitations.
-
-RHP supports explicit same-page annual statements, basis/units/full dates and aligned
-numeric rows. Unsupported/scanned layouts, conflicting/footnoted values and unapproved
-hosts are withheld, not guessed. The regression suite exercises PDF extraction with
-a controlled PDF; it does not certify every issuer's document layout. Page citations
-are stored. Existing RHP offer facts are unaffected. No DRHP financial publication.
-
-Run `dotnet test --no-restore`. Tests include source ordering, malformed responses,
-negative/zero figures, bounded downloads and fallback parsing. The PostgreSQL table
-and API integration tests live in the backend repo. News remains default-off and
-no paid services or OS schedules were created. Stop for local review before merge.
+Tests cover source ordering, unavailable versus failure handling, signs/units/basis, bounded transfer, malformed responses, retained data and controlled PDF extraction. They do not certify every issuer layout or current upstream completeness. Use recorded run counts only for the timestamp/revision that produced them; see [current release status](https://github.com/anish689/OnlyIPO/blob/main/docs/current-status.md).

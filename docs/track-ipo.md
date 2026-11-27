@@ -1,5 +1,9 @@
 # Phase 17: Upstox Daily Tracking
 
+<!-- historical-status -->
+> **Historical record / plan.** Preserved for its original revision and dates; this is not current deployment instruction or proof of present readiness. Use the [documentation index](documentation-index.md) and current release status. Do not execute old mutations or resume stopped jobs from this record.
+
+
 Story: https://github.com/anish689/OnlyIPO.Scheduler/issues/9
 API story/migration: https://github.com/anish689/OnlyIPO/issues/33
 Frontend: https://github.com/anish689/only-ipo-web/issues/28

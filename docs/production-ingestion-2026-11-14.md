@@ -1,5 +1,9 @@
 # Production ingestion acceptance: 14 November 2026
 
+<!-- historical-status -->
+> **Historical record / plan.** Preserved for its original revision and dates; this is not current deployment instruction or proof of present readiness. Use the [documentation index](documentation-index.md) and current release status. Do not execute old mutations or resume stopped jobs from this record.
+
+
 Updated 15 November: five partitions passed; financials completed with one
 reported source failure. Not approval for public release or automatic scheduling.
 

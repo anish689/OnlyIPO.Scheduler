@@ -1,5 +1,9 @@
 # Hosting phase H1: free-only one-shot execution
 
+<!-- historical-status -->
+> **Historical record / plan.** Preserved for its original revision and dates; this is not current deployment instruction or proof of present readiness. Use the [documentation index](documentation-index.md) and current release status. Do not execute old mutations or resume stopped jobs from this record.
+
+
 ## Refresh availability safeguard: 4 October 2026
 
 Financial downloads and PDF parsing run on the separate GitHub Actions worker,

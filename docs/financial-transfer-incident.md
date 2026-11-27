@@ -1,5 +1,9 @@
 # Financial transfer incident: 15 October 2026
 
+<!-- historical-status -->
+> **Historical record / plan.** Preserved for its original revision and dates; this is not current deployment instruction or proof of present readiness. Use the [documentation index](documentation-index.md) and current release status. Do not execute old mutations or resume stopped jobs from this record.
+
+
 Scheduled run 38611846809 completed open, upcoming, closed, listed and tracking.
 Financials attempted 29 companies: 28 unavailable and one failed, Zetwerk.
 The provider RHP returned 403; the reviewed SEBI replacement returned 200 but

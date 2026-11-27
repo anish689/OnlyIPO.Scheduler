@@ -1,5 +1,9 @@
 # Financial refresh and fallback strategy
 
+<!-- historical-status -->
+> **Historical record / plan.** Preserved for its original revision and dates; this is not current deployment instruction or proof of present readiness. Use the [documentation index](documentation-index.md) and current release status. Do not execute old mutations or resume stopped jobs from this record.
+
+
 14 October 2026. Scope: financial statements, not prices or subscription multiples.
 
 ## Decision

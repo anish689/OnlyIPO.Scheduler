@@ -1,5 +1,9 @@
 # Listed catalogue job timeout
 
+<!-- historical-status -->
+> **Historical record / plan.** Preserved for its original revision and dates; this is not current deployment instruction or proof of present readiness. Use the [documentation index](documentation-index.md) and current release status. Do not execute old mutations or resume stopped jobs from this record.
+
+
 Issue: [#47](https://github.com/anish689/OnlyIPO.Scheduler/issues/47).
 
 Production run [44248786510](https://github.com/anish689/OnlyIPO.Scheduler/actions/runs/44248786510)
