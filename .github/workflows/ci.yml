@@ -7,6 +7,24 @@ on:
       - main
 
 jobs:
+  backup-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install rehearsal tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq age postgresql-17 postgresql-client-17
+      - name: Fictional backup, restore, encryption and failure-path tests
+        env:
+          BACKUP_TEST_PG_BIN: /usr/lib/postgresql/17/bin
+        run: python3 -m unittest discover -s scripts/backup -p 'test_*.py' -v
+
   build-test:
     runs-on: ubuntu-latest
     services:
@@ -39,7 +57,7 @@ jobs:
         with:
           node-version: '22'
       - name: Monitoring and workflow policy tests
-        run: node --test scripts/refresh-health.test.mjs scripts/workflow-contract.test.mjs
+        run: node --test scripts/refresh-health.test.mjs scripts/workflow-contract.test.mjs scripts/backup/health.test.mjs
 
       - name: Build
         run: dotnet build IPOOnly.Scheduler.sln --configuration Release --no-restore

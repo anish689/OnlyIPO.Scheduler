@@ -1,0 +1,56 @@
+name: Production encrypted database backup
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 19:43 UTC / 01:13 India time. After the final 16:07 refresh window.
+    - cron: '43 19 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: youripo-production-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    if: github.ref == 'refs/heads/main' && vars.PRODUCTION_BACKUP_ENABLED == 'true' && (github.event_name == 'workflow_dispatch' || vars.PRODUCTION_BACKUP_SCHEDULE_ENABLED == 'true')
+    environment: production-backup
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Prepare backup tools and verified CA
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq age postgresql-17 postgresql-client-17
+          curl --fail --silent --show-error --proto '=https' --tlsv1.2 \
+            --connect-timeout 15 --max-time 60 \
+            https://supabase-downloads.s3-ap-southeast-1.amazonaws.com/prod/ssl/prod-ca-2021.crt \
+            --output "$RUNNER_TEMP/supabase-ca.crt"
+          echo "700723581420dd1ac98fd7e9ac529f0ef210eadcaf87fc868a3ad7d114c2f3b7  $RUNNER_TEMP/supabase-ca.crt" | sha256sum --check --status
+          openssl x509 -in "$RUNNER_TEMP/supabase-ca.crt" -noout -checkend 86400
+      - name: Export, restore-check, encrypt and verify private Drive copy
+        env:
+          PG_BIN: /usr/lib/postgresql/17/bin
+          BACKUP_CA_FILE: ${{ runner.temp }}/supabase-ca.crt
+          PRODUCTION_BACKUP_ENABLED: ${{ vars.PRODUCTION_BACKUP_ENABLED }}
+          BACKUP_RETENTION_ENABLED: ${{ vars.BACKUP_RETENTION_ENABLED }}
+          BACKUP_AGE_RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
+          BACKUP_DRIVE_FOLDER_ID: ${{ vars.BACKUP_DRIVE_FOLDER_ID }}
+          BACKUP_DB_PASSWORD: ${{ secrets.BACKUP_DB_PASSWORD }}
+          DRIVE_CLIENT_ID: ${{ secrets.DRIVE_CLIENT_ID }}
+          DRIVE_CLIENT_SECRET: ${{ secrets.DRIVE_CLIENT_SECRET }}
+          DRIVE_REFRESH_TOKEN: ${{ secrets.DRIVE_REFRESH_TOKEN }}
+        run: python3 scripts/backup/run.py
+      - name: Clean private temporary data
+        if: always()
+        shell: bash
+        run: |
+          # Dedicated ephemeral hosted runner, fixed backup-specific directories.
+          find /tmp -maxdepth 1 -type d \( -name 'youripo-production-backup-*' -o -name 'youripo-restore-*' \) -user "$(id -un)" -exec rm -rf -- {} +
