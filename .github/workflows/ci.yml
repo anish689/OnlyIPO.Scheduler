@@ -46,10 +46,10 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          global-json-file: global.json
 
-      - name: Restore
-        run: dotnet restore IPOOnly.Scheduler.sln
+      - name: Restore and reject vulnerable dependencies
+        run: dotnet restore IPOOnly.Scheduler.sln -p:NuGetAuditMode=all -warnaserror:NU1900,NU1901,NU1902,NU1903,NU1904
 
       - uses: actions/setup-node@v4
         with:
