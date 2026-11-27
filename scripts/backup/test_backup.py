@@ -1,4 +1,5 @@
 import io
+import copy
 import json
 import os
 from pathlib import Path
@@ -155,6 +156,45 @@ class DriveTests(unittest.TestCase):
             with self.assertRaisesRegex(BackupError, "download_checksum"):
                 drive.upload_verified(path, FOLDER, "a"*64)
         self.assertFalse(any(kw.get("method") == "PATCH" for _, kw in mutations))
+
+    def test_retention_applies_only_old_verified_owned_copies(self):
+        drive, _, _ = self.drive([])
+        drive.assert_folder = lambda value: None
+        files = [item(i) for i in range(50)] + [item(80, "pending", state="pending")]
+        trashed = []
+        def call(path, **kwargs):
+            if path == "files":
+                return {"files": copy.deepcopy(files)}
+            self.assertEqual(kwargs, {"method": "PATCH", "value": {"trashed": True}})
+            trashed.append(path.removeprefix("files/"))
+            return {}
+        drive.call = call
+        drive.assert_private = lambda value: copy.deepcopy(next(x for x in files if x["id"] == value))
+        self.assertEqual(drive.retain(FOLDER, files[0]["id"], NOW, apply=True), 41)
+        self.assertEqual(len(trashed), 41)
+        for day in (0, 1, 2, 3, 4, 5, 6, 12, 19):
+            self.assertNotIn(item(day)["id"], trashed)
+        self.assertNotIn(files[-1]["id"], trashed)
+
+    def test_retention_stops_if_a_candidate_changes_after_listing(self):
+        drive, _, _ = self.drive([])
+        drive.assert_folder = lambda value: None
+        files = [item(i) for i in range(50)]
+        mutations = []
+        def call(path, **kwargs):
+            if path == "files":
+                return {"files": copy.deepcopy(files)}
+            mutations.append(path)
+            return {}
+        def fresh(value):
+            result = copy.deepcopy(next(x for x in files if x["id"] == value))
+            if value != files[0]["id"]:
+                result["appProperties"]["state"] = "pending"
+            return result
+        drive.call, drive.assert_private = call, fresh
+        with self.assertRaisesRegex(BackupError, "metadata_changed"):
+            drive.retain(FOLDER, files[0]["id"], NOW, apply=True)
+        self.assertEqual(mutations, [])
 
 
 class GateTests(unittest.TestCase):

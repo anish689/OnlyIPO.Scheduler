@@ -76,17 +76,24 @@ expected market data.
    password as environment secret `BACKUP_DB_PASSWORD`. Do not use `postgres`,
    `youripo_api` or `youripo_scheduler` credentials. Reapply/review after schema
    changes and confirm the next backup succeeds.
-3. Use a dedicated Google OAuth desktop client and enable the Drive API in an
-   unbilled/Standard Tier project. Request **only**
+3. Use Google's supported [Personal mode onboarding](https://console.cloud.google.com/auth/overview/personal)
+   to create a dedicated owner-only desktop client, then enable the Drive API in
+   its unbilled/Standard Tier project. Personal mode can authorize only its creator
+   and avoids the seven-day Testing token expiry; it is a one-time project choice
+   and cannot be selected for an existing External project. Do not select the
+   AI-agent option for this deterministic backup script. Request **only**
    `https://www.googleapis.com/auth/drive.file`, with offline access. Do not reuse
-   a website sign-in client or authorize all Drive files. External consent in
-   Testing expires offline tokens after seven days; resolve that publishing
-   setting before unattended activation. Never enable Scaled Tier or billing.
+   a website sign-in client or authorize all Drive files. If a future organization
+   needs multiple operators, review a separate supported authorization setup;
+   never substitute an expiring External/Testing token for unattended operation.
+   Never enable Scaled Tier or billing.
 4. Use `scripts/backup/authorize_drive.py` locally with the privately downloaded
    client JSON. It validates state/PKCE, stores credentials directly in the
    `production-backup` GitHub environment, creates a new private folder and saves
    its ID. It does not print tokens or touch existing manual backup folders.
    The owner may need to complete Google consent privately in the opened browser.
+   Keep the original client JSON in a private recovery store if reauthorization
+   may be needed; do not commit it or put it in the backup folder unencrypted.
 5. Save the **public** age recipient as environment variable
    `BACKUP_AGE_RECIPIENT`; the matching private key must already be stored
    separately in the owner's password manager. Existing verified backup key can
@@ -123,6 +130,20 @@ create another folder on every credential rotation.
 
 ## Verification
 
+Activation evidence (27 November 2026): implementation PR #64 passed backup and
+scheduler CI and merged as `ab973303985291ff3c87f1376ef1987e47edebc6`.
+[Manual production backup run](https://github.com/anish689/OnlyIPO.Scheduler/actions/runs/45987871052)
+completed its isolated restore and encrypted Drive download verification. A
+separate owner-browser download was decrypted with the independently held key
+and restored locally: 32 application tables, 20 migrations, counts/schema/RLS
+matched. [Watchdog acceptance](https://github.com/anish689/OnlyIPO.Scheduler/actions/runs/45988886723)
+passed. The dedicated environment is main-branch-only, the Google OAuth audience
+is Personal and the project has no billing account. Daily scheduling and
+retention were enabled after these checks. The first scheduled invocation is
+due 27 November at 19:43 UTC / 28 November at 01:13 IST; it had not occurred at
+this checkpoint. This manual acceptance is not a claim of historical daily
+coverage, future uptime or a guaranteed recovery time.
+
 `BACKUP_TEST_PG_BIN=/path/to/postgresql/17/bin python3 -m unittest discover -s scripts/backup -p 'test_*.py' -v`
 
 The isolated rehearsal uses fictional data, proves concurrent commits do not
@@ -135,5 +156,6 @@ handling, corrupt offsite download rejection, retention and activation gates.
 References: [GitHub Actions billing](https://docs.github.com/en/actions/concepts/billing-and-usage),
 [Drive narrow scopes](https://developers.google.com/workspace/drive/api/guides/api-specific-auth),
 [Google OAuth offline-token limitations](https://developers.google.com/identity/protocols/oauth2),
+[Google owner-only Personal mode](https://support.google.com/cloud/answer/15544987),
 [Drive quotas/Standard Tier](https://developers.google.com/workspace/drive/api/guides/quotas),
 [PostgreSQL 17 pg_dump](https://www.postgresql.org/docs/17/app-pgdump.html).
